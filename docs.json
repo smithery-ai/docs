@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "maple",
   "name": "Smithery Documentation",
   "colors": {
     "primary": "#EA580C",
@@ -42,7 +42,7 @@
         "tab": "Build MCPs",
         "groups": [
           {
-            "group": "Build MCPs",
+            "group": "Introduction",
             "pages": [
               "build/index",
               "build/deployments"
@@ -70,7 +70,7 @@
         {
           "anchor": "Smithery",
           "href": "https://smithery.ai",
-          "icon": "home"
+          "icon": "anvil"
         },
         {
           "anchor": "GitHub",
