@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Smithery Documentation",
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
@@ -11,45 +11,55 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Getting Started",
         "groups": [
           {
-            "group": "Get Started",
+            "group": "Introduction",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
-            ]
-          },
-          {
-            "group": "Essentials",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/settings",
-              "essentials/navigation",
-              "essentials/reusable-snippets"
+              "introduction"
             ]
           }
         ]
       },
       {
-        "tab": "API Reference",
+        "tab": "Use MCPs",
         "groups": [
           {
-            "group": "API Documentation",
+            "group": "Use MCPs",
             "pages": [
-              "api-reference/introduction"
+              "use/index",
+              "use/registry",
+              "use/connect",
+              "use/session-config",
+              "use/profiles",
+              "use/data-policy",
+              "use/deep-linking"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Build MCPs",
+        "groups": [
+          {
+            "group": "Build MCPs",
+            "pages": [
+              "build/index",
+              "build/deployments"
             ]
           },
           {
-            "group": "Endpoint Examples",
+            "group": "Project Configuration",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "build/project-config/index",
+              "build/project-config/dockerfile",
+              "build/project-config/smithery-yaml"
+            ]
+          },
+          {
+            "group": "Permissions",
+            "pages": [
+              "build/permissions"
             ]
           }
         ]
@@ -58,19 +68,14 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "Smithery",
+          "href": "https://smithery.ai",
+          "icon": "home"
         },
         {
-          "anchor": "Community",
-          "href": "https://mintlify.com/community",
-          "icon": "slack"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "GitHub",
+          "href": "https://github.com/smithery-ai",
+          "icon": "github"
         }
       ]
     }
@@ -83,20 +88,19 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "href": "mailto:support@smithery.ai"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "href": "https://smithery.ai/dashboard"
     }
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/smithery-ai",
+      "twitter": "https://twitter.com/smitheryai"
     }
   }
 }

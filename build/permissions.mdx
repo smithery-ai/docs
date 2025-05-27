@@ -1,0 +1,25 @@
+---
+title: 'Git Integration'
+description: 'Learn about the GitHub permissions required for Smithery integration.'
+---
+
+# Git Integration
+
+Smithery for GitHub automatically verifies and deploys your MCP servers directly from your repository. Test every PR with interactive server inspections, get real-time deployment status, and resolve issues faster—all without any manual configuration.
+
+### Repository Permissions
+
+Smithery requires the following permissions to your connected Github account:
+
+| **Permission** | **Read** | **Write** | **Description** |
+|---------------|---------|----------|-----------------|
+| **Contents**   | ✓ | ✓ | Allows us to fetch and write source code in order to generate new pull requests on new branches. We only commit to new branches that we create, so they do not affect your existing branches. |
+| **Pull Requests** | ✓ | ✓ | Enables us to create pull requests for the generated changes and add interactive server inspection links directly within your PR discussions for immediate testing. |
+| **Metadata**   | ✓ | ✗ | Allows us to access basic repository information to help provide insights and ensure seamless integration with your GitHub account. |
+| **Checks** | ✓ | ✓ | Enables Smithery to create and view detailed status reports on your server. |
+| **Commit Status** | ✓ | ✓ | Allows us to mark commits with success/failure/pending states that appear in pull requests, showing MCP server deployment status. |
+| **Deployments** | ✓ | ✓ | Provides access to create and manage deployment processes for your MCP servers when code changes. |
+| **Issues** | ✓ | ✓ | Enables Smithery to automatically create issues when problems are detected in your server code or deployment process, helping track and resolve implementation bugs. |
+| **Repository Hooks** | ✓ | ✓ | Allows creation and management of webhooks that notify Smithery when code changes, enabling automated updates to your MCP servers. |
+
+These permissions allow Smithery to create a seamless integration with Github, responding automatically to your code changes and keeping your MCP servers up-to-date.

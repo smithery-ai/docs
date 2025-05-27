@@ -1,0 +1,47 @@
+---
+title: 'Deployments'
+description: 'Learn how to deploy your MCP server on Smithery.'
+---
+
+# Deployments
+
+Smithery Deployments allow you to host your MCP server on Smithery served over [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection.
+
+## Overview
+
+Deploying on Smithery is straightforward:
+
+1. [Add your server](/new) to Smithery (or claim it if it's already listed)
+2. Click Deploy on Smithery Deployments tab on your server page (_only authenticated server owners can see this tab_)
+
+That's it! Your MCP server will be built and deployed according to your [project configuration](/build/project-config).
+
+## Supported Transports
+We are able to host MCP servers that use the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) and the [stdio](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#stdio) transport based on the `type` defined in your [project configuration](/build/project-config).
+
+### HTTP
+This is the native and recommended way to deploy your server on Smithery.
+We provide an [SDK in TypeScript](https://github.com/smithery-ai/sdk) to help you create a Smithery-compatible HTTP server.
+
+If you prefer to implement the server yourself without using our SDK, you should follow the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) specification and use MCP's official language-specific SDK.
+There are a few Smithery-specified details you should be aware of:
+
+1. The `/mcp` endpoint MUST be available and will be used to process `GET`, `POST` and `DELETE` requests as part of the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) specification.
+2. If your server requires configuration, we MUST pass the [configuration object](/use/session-config) to your server as a query parameter: `/mcp?config={...}` in base64 encoding.
+
+### STDIO
+**This is deprecated.**
+
+We highly recommend using HTTP servers over STDIO servers for better performance and future proofing for OAuth support. If you deploy a STDIO server, we will wrap your server and proxy it over HTTP for you.
+
+## Serverless Hosting
+
+We serve your hosted MCP servers on Smithery over streamable HTTP in a serverless environment. Connections to stateful servers will timeout after 2 minutes of inactivity.
+You will need to handle reconnection at the client if needed.
+You should design your server with ephemeral storage in mind.
+Persistent data should be stored in an external database.
+
+## Tool Lists
+Smithery can only display tool lists for servers that don't require authentication to list tools. Server developers must ensure that the list tools functionality is not dependent on any API keys or configurations that users have to provide.
+
+As a server developer, you can implement this by supporting "lazy loading" - only authenticating using your required configuration/API keys upon tool call, rather than upon initialization or tool listing.

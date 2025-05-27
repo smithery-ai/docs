@@ -1,0 +1,284 @@
+---
+title: 'Registry API'
+description: 'The Smithery Registry API provides a programmatic way to search for MCP servers.'
+---
+
+# Registry API
+
+The Smithery Registry API provides a programmatic way to search for MCP servers. This documentation will walk you through using the Registry API to obtain a remote MCP server.
+
+## Concepts
+Our registry contains an index of MCP servers. Every server may have different ways of launching or connecting to them. Server authors specify a [configuration schema](/build/project-config), which is a JSON schema that defines the structure of the configuration that is required to connect to the server.
+
+## Authentication
+All endpoints require authentication via a bearer token. You can create an API key [here](https://smithery.ai/account/api-keys).
+
+Include the following header in your API requests:
+
+```typescript
+headers: {
+  'Authorization': 'Bearer smithery-api-token'
+}
+```
+
+## List Servers
+
+```http
+GET https://registry.smithery.ai/servers
+```
+
+Retrieves a paginated list of all available servers.
+
+#### Query Parameters
+
+- `q` (optional): Search query. We use semantic search, so treat this as a prompt.
+- `page` (optional): Page number for pagination (default: 1)
+- `pageSize` (optional): Number of items per page (default: 10)
+
+#### Filtering
+
+- **Text Search**: Simply type any text to search semantically (e.g., `machine learning`)
+- **Owner Filter**: Use `owner:username` to filter by repository owner (e.g., `owner:smithery-ai`)
+- **Repository Filter**: Use `repo:repository-name` to filter by repository name (e.g., `repo:fetch`)
+- **Deployment Status**: Use `is:deployed` to show only deployed servers
+- **Verification Status**: Use `is:verified` to show only verified servers
+
+You can combine multiple filters together. For example:
+
+```text
+owner:mem0ai is:verified memory
+```
+
+#### Example Request
+
+<Tabs>
+  <Tab title="JavaScript">
+```javascript
+// JavaScript example using fetch
+const apiKey = 'your-smithery-api-token';
+const query = 'owner:mem0ai is:verified memory';
+const encodedQuery = encodeURIComponent(query);
+
+const response = await fetch(
+  `https://registry.smithery.ai/servers?q=${encodedQuery}&page=1&pageSize=10`,
+  {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Accept': 'application/json'
+    }
+  }
+);
+
+const data = await response.json();
+console.log(data);
+```
+  </Tab>
+  <Tab title="Python">
+```python
+# Python example using requests
+import requests
+from urllib.parse import quote
+
+api_key = 'your-smithery-api-token'
+query = 'owner:mem0ai is:verified memory'
+encoded_query = quote(query)
+
+response = requests.get(
+    f'https://registry.smithery.ai/servers?q={encoded_query}&page=1&pageSize=10',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Accept': 'application/json'
+    }
+)
+
+data = response.json()
+print(data)
+```
+  </Tab>
+  <Tab title="Bash">
+```bash
+# Using cURL
+curl -X GET "https://registry.smithery.ai/servers?q=owner:mem0ai%20is:verified%20memory&page=1&pageSize=10" \
+  -H "Authorization: Bearer your-smithery-api-token" \
+  -H "Accept: application/json"
+```
+  </Tab>
+</Tabs>
+
+#### Response Type
+
+```typescript
+{
+    servers: Array<{
+      qualifiedName: string;
+      displayName: string;
+      description: string;
+      // Link to Smithery server page
+      homepage: string;
+      // Number of times the server has been used via tool calling
+      useCount: string;
+      // True if this server is deployed on Smithery as a HTTP server
+      isDeployed: boolean
+      createdAt: string;
+    }>;
+    pagination: {
+      currentPage: number;
+      pageSize: number;
+      totalPages: number;
+      totalCount: number;
+    };
+  }
+```
+
+The response includes basic information about each server and pagination details to help you navigate through the list of servers.
+
+## Get Server
+
+```http
+GET https://registry.smithery.ai/servers/{qualifiedName}
+```
+
+Retrieves information about a specific server by its qualified name. The qualified name is a unique human-readable identifier for the server. You can find the qualified name from the server page's url: `https://smithery.ai/server/{qualifiedName}`.
+
+#### Example Request
+
+<Tabs>
+  <Tab title="JavaScript">
+```javascript
+// JavaScript example using fetch
+const apiKey = 'your-smithery-api-token';
+const qualifiedName = 'exa';
+
+const response = await fetch(
+  `https://registry.smithery.ai/servers/${qualifiedName}`,
+  {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Accept': 'application/json'
+    }
+  }
+);
+
+const data = await response.json();
+console.log(data);
+```
+  </Tab>
+  <Tab title="Python">
+```python
+# Python example using requests
+import requests
+
+api_key = 'your-smithery-api-token'
+qualified_name = 'exa'
+
+response = requests.get(
+    f'https://registry.smithery.ai/servers/{qualified_name}',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Accept': 'application/json'
+    }
+)
+
+data = response.json()
+print(data)
+```
+  </Tab>
+  <Tab title="Bash">
+```bash
+# Using cURL
+curl -X GET "https://registry.smithery.ai/servers/exa" \
+  -H "Authorization: Bearer your-smithery-api-token" \
+  -H "Accept: application/json"
+```
+  </Tab>
+</Tabs>
+
+#### Response Type
+
+```typescript
+{
+    qualifiedName: string;
+    displayName: string;
+    iconUrl: string | null;
+    deploymentUrl: string;
+    connections: Array<{
+      type: string;
+      url?: string;
+      configSchema: JSONSchema;
+    }>;
+    security: {
+      scanPassed: boolean;
+    } | null;
+    tools: Array<{
+      name: string;
+      description: string | null;
+      inputSchema: {
+        type: "object";
+        properties?: object;
+      };
+      // And potentially other properties of the Tool object
+    }> | null;
+}
+```
+
+The response contains a comprehensive record of the server, including connection details and security information.
+
+### Properties
+
+#### name
+**Type**: `string`
+
+Qualified name of the MCP server in the format `owner/repository`.
+
+#### displayName
+**Type**: `string`
+
+Human-readable name of the MCP server.
+
+#### iconUrl
+**Type**: `string | null`
+
+URL to the server's icon image, or `null` if no icon is available.
+
+#### connections
+**Type**: `Array`
+
+Specifies how to connect to this server. Each object in the array represents a different connection method.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | `string` | Connection type. Either `"http"` or `"stdio"`. |
+| `url` | `string` | HTTP URL to connect to (for `http` type). |
+| `configSchema` | `object` | JSON Schema defining required configuration options. |
+
+#### security
+**Type**: `object`
+
+Information about the server's security status.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `scanPassed` | `boolean` \| `null` | Whether the server has passed security checks. `null` if no scan has been performed. |
+
+<Info>
+We use [Invariant](https://invariantlabs.ai/blog/introducing-mcp-scan) to scan for tool poisoning, rug pulls, cross-origin escalations, and prompt injection attacks.
+</Info>
+
+#### tools
+**Type**: `Array | null`
+
+List of tools that this server provides, or `null` if no tools have been retrieved.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | Name of the tool. |
+| `description` | `string` | Description of the tool. |
+| `inputSchema` | `object` | JSON Schema defining the required parameters for the tool. |
+
+<Note>
+Tool information is cached from the server's last deployment. The actual tools returned by the MCP server at runtime may differ based on configuration or server updates.
+</Note>
+
+## Next Step
+
+Once you have retrieved a server and its connection details, you can connect to it using the [Connect to MCPs](/use/connect) guide.

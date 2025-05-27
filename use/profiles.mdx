@@ -1,0 +1,139 @@
+---
+title: 'Configuration Profiles'
+description: 'Learn how to use configuration profiles to group session configurations and supply them to your AI agents.'
+---
+
+# Configuration Profiles
+
+<Info>
+  Profiles are currently under active development. We'd love to hear your feedback and suggestions in our <a href="https://discord.gg/Afd38S5p9A">Discord community</a>!
+</Info>
+
+Configuration profiles (or **profiles** for short) are a way for you to group [session configurations](/use/session-config) and supply them to your AI agents. 
+Think of it like login profiles in your desktop, which let you decide what applications are installed and what accesses a user has in your computer.
+In a similar way, profiles let you bundle specific servers and their configurations to your agent.
+
+## Examples
+
+Say you're building a coding assistant. A "Coding Assistant" profile could connect Gitingest MCP for code repository access, Memory Tool for storing context, and Context7 for semantic search - giving your agent everything it needs to help with coding tasks.
+
+Instead of managing multiple API keys and configurations separately, profiles let you bundle them together and reuse them across your agents. Here's how it works:
+
+To add servers to your profile, you can:
+- From any server page, select the profile you want to add the server to and click "Connect"
+- From Account > Profiles, select your profile and use the "Add Server" search bar shown below
+
+![Profiles View](/images/profiles.png)
+
+## Using Profiles with Individual Servers
+
+When connecting to individual servers, you can use your profile to automatically load the saved configuration:
+
+```typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { createSmitheryUrl } from "@smithery/sdk/config.js"
+
+// Get your profile ID from the Smithery Profile page (e.g. "ratty-jay-1nmAzn")
+const profileId = "your-profile-id"
+const apiKey = "your-smithery-api-key"
+
+// Create URL with profile in config
+const url = createSmitheryUrl(
+  "https://server.smithery.ai/gitingest/mcp",
+  { profile: profileId },
+  apiKey
+)
+
+const transport = new StreamableHTTPClientTransport(url)
+
+// Create and configure the client
+const client = new Client({
+  name: "Coding Assistant",
+  version: "1.0.0"
+})
+
+// Connect to the specific MCP server
+await client.connect(transport)
+```
+
+## Using Profiles with Toolbox
+
+The [Toolbox](https://smithery.ai/server/@smithery/toolbox) is a special MCP server that can load all tools from your profile at once. This is useful when you want to access all your configured servers in a single connection:
+
+```typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { createSmitheryUrl } from "@smithery/sdk/config.js"
+
+// Get your profile ID from the Smithery Profile page (e.g. "ratty-jay-1nmAzn")
+const profileId = "your-profile-id"
+const apiKey = "your-smithery-api-key"
+
+// Create URL with profile in config
+const url = createSmitheryUrl(
+  "https://server.smithery.ai/@smithery/toolbox/mcp",
+  { profile: profileId },
+  apiKey
+)
+
+const transport = new StreamableHTTPClientTransport(url)
+
+// Create and configure the client
+const client = new Client({
+  name: "Coding Assistant",
+  version: "1.0.0"
+})
+
+// Connect to the toolbox - this will load all tools from your profile
+await client.connect(transport)
+```
+
+Instead of the typical way where you'd need to specify all configurations:
+
+```typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { createSmitheryUrl } from "@smithery/sdk/config.js"
+
+// Configure each server separately with their own API keys and settings
+const exaUrl = createSmitheryUrl(
+  "https://servers.smithery.ai/exa",
+  {
+    config: {
+      api_key: "your-exa-api-key",
+    },
+  }
+)
+const exaTransport = new StreamableHTTPClientTransport(exaUrl)
+
+const zoteroUrl = createSmitheryUrl(
+  "https://servers.smithery.ai/zotero",
+  {
+    config: {
+      api_key: "your-zotero-api-key",
+      library_id: "your-library-id",
+      collection_key: "your-collection",
+    },
+  }
+)
+const zoteroTransport = new StreamableHTTPClientTransport(zoteroUrl)
+
+const pubmedUrl = createSmitheryUrl(
+  "https://servers.smithery.ai/pubmed",
+  {
+    config: {
+      api_key: "your-pubmed-api-key",
+      database: "pubmed",
+      max_results: 10,
+    },
+  }
+)
+const pubmedTransport = new StreamableHTTPClientTransport(pubmedUrl)
+
+// ... and so on for each server you want to connect to
+```
+
+Configuration profiles act as a default configuration fallback and makes all saved configuration fields optional. You can still pass configuration fields upon connecting to overwrite the default profile configuration.
+
+Obviously, this is not very useful if you're only connecting to one MCP. It becomes handy when you have multiple MCPs and you don't want to specify configurations for each of them.
+Some MCPs require OAuth, which may have complex configurations. In the future, you can authenticate via the UI on Smithery instead of offloading it to your end users.
