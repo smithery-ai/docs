@@ -7,8 +7,28 @@
     "light": "#F97316",
     "dark": "#C2410C"
   },
+  "modeToggle": {
+    "default": "dark"
+  },
   "favicon": "/favicon.svg",
   "navigation": {
+    "sidebar": [
+      {
+        "group": "",
+        "pages": [
+          {
+            "group": "Smithery",
+            "icon": "anvil",
+            "pages": ["https://smithery.ai"]
+          },
+          {
+            "group": "GitHub",
+            "icon": "github",
+            "pages": ["https://github.com/smithery-ai"]
+          }
+        ]
+      }
+    ],
     "tabs": [
       {
         "tab": "Getting Started",
