@@ -3,9 +3,9 @@
   "theme": "mint",
   "name": "Smithery Documentation",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#EA580C",
+    "light": "#F97316",
+    "dark": "#C2410C"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -16,7 +16,7 @@
           {
             "group": "Introduction",
             "pages": [
-              "introduction"
+              "index"
             ]
           }
         ]
@@ -25,7 +25,7 @@
         "tab": "Use MCPs",
         "groups": [
           {
-            "group": "Use MCPs",
+            "group": "Introduction",
             "pages": [
               "use/index",
               "use/registry",
