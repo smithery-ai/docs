@@ -20,7 +20,7 @@ Every MCP server can define what configuration parameters it accepts. These para
 Session configurations are defined by the author of the MCP.
 MCP server developers define their configuration requirements using JSON Schema in the `configSchema` field of their [`smithery.yaml`](/build/project-config/smithery-yaml) file:
 
-```yaml showHeader headerLabel="smithery.yaml (partial)"
+```yaml smithery.yaml
 startCommand:
     type: stdio
     configSchema:
@@ -74,7 +74,7 @@ Configurations sometimes contain sensitive information like API keys. It's recom
 
 If your server doesn't need any configuration, you can use an empty schema:
 
-```yaml showHeader headerLabel="No Configuration Required"
+```yaml smithery.yaml
   startCommand:
     type: http
     configSchema: {}
@@ -90,7 +90,7 @@ If your server doesn't need any configuration, you can use an empty schema:
 
 A database connector might require connection details:
 
-```yaml showHeader headerLabel="Database Configuration Example"
+```yaml smithery.yaml
   startCommand:
     type: stdio
     configSchema:

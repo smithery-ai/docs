@@ -10,99 +10,60 @@
   "modeToggle": {
     "default": "dark"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/logo/logo.svg",
   "navigation": {
-    "sidebar": [
+    "groups": [
       {
-        "group": "",
+        "group": "Getting Started",
         "pages": [
-          {
-            "group": "Smithery",
-            "icon": "anvil",
-            "pages": ["https://smithery.ai"]
-          },
-          {
-            "group": "GitHub",
-            "icon": "github",
-            "pages": ["https://github.com/smithery-ai"]
-          }
-        ]
-      }
-    ],
-    "tabs": [
-      {
-        "tab": "Getting Started",
-        "groups": [
-          {
-            "group": "Introduction",
-            "pages": [
-              "index"
-            ]
-          }
+          "index"
         ]
       },
       {
-        "tab": "Use MCPs",
-        "groups": [
-          {
-            "group": "Introduction",
-            "pages": [
-              "use/index",
-              "use/registry",
-              "use/connect",
-              "use/session-config",
-              "use/profiles",
-              "use/data-policy",
-              "use/deep-linking"
-            ]
-          }
+        "group": "Use MCP Servers",
+        "pages": [
+          "use/index",
+          "use/registry",
+          "use/connect",
+          "use/session-config",
+          "use/profiles",
+          "use/data-policy",
+          "use/deep-linking"
         ]
       },
       {
-        "tab": "Build MCPs",
-        "groups": [
-          {
-            "group": "Introduction",
-            "pages": [
-              "build/index",
-              "build/deployments"
-            ]
-          },
-          {
-            "group": "Project Configuration",
-            "pages": [
-              "build/project-config/index",
-              "build/project-config/dockerfile",
-              "build/project-config/smithery-yaml"
-            ]
-          },
-          {
-            "group": "Permissions",
-            "pages": [
-              "build/permissions"
-            ]
-          }
+        "group": "Build MCP Servers",
+        "pages": [
+          "build/index",
+          "build/deployments"
+        ]
+      },
+      {
+        "group": "Project Configuration",
+        "pages": [
+          "build/project-config/index",
+          "build/project-config/dockerfile",
+          "build/project-config/smithery-yaml"
+        ]
+      },
+      {
+        "group": "Permissions",
+        "pages": [
+          "build/permissions"
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Smithery",
-          "href": "https://smithery.ai",
-          "icon": "anvil"
-        },
-        {
-          "anchor": "GitHub",
-          "href": "https://github.com/smithery-ai",
-          "icon": "github"
-        }
-      ]
-    }
+    ]
+  },
+  "icons": {
+    "library": "lucide"
+  },
+  "fonts": {
+    "family": "Geist"
   },
   "logo": {
     "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "dark": "/logo/dark.svg",
+    "href": "https://smithery.ai"
   },
   "navbar": {
     "links": [
@@ -120,7 +81,7 @@
   "footer": {
     "socials": {
       "github": "https://github.com/smithery-ai",
-      "twitter": "https://twitter.com/smitheryai"
+      "twitter": "https://twitter.com/SmitheryDotAI"
     }
   }
 }
