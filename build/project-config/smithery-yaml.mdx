@@ -1,0 +1,99 @@
+---
+title: 'smithery.yaml Reference'
+description: 'Reference documentation for the smithery.yaml configuration file.'
+---
+
+# smithery.yaml Reference
+
+The `smithery.yaml` file provides configuration for your Model Context Protocol (MCP) server on Smithery. This file must be placed in your repository root.
+
+## Configuration Options
+
+### startCommand
+**Type**: Object (Required)
+
+Defines how to start your MCP server. The structure varies based on the server type you're using.
+
+Smithery supports two types of MCP servers: HTTP and STDIO. Choose the appropriate configuration based on your server implementation.  
+
+#### HTTP Server Configuration
+
+```yaml
+startCommand:
+  type: http
+  configSchema: object
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | string | Must be set to `"http"` for HTTP-based MCP servers |
+| `configSchema` | object | JSON Schema defining the configuration options for your server. Smithery uses this to validate user configurations before starting your server. |
+
+With HTTP servers, Smithery will start your application and route MCP traffic to the `/mcp` endpoint under the provided `PORT` environment variable. Your server needs to implement the [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) protocol and handle configuration objects passed via the query parameter.
+
+**Example HTTP Configuration:**
+
+```yaml
+startCommand:
+  type: http
+  configSchema:
+    type: object
+    required: ["apiKey"]
+    properties:
+      apiKey:
+        type: string
+        title: "API Key"
+        description: "Your API key"
+      temperature:
+        type: number
+        default: 0.7
+        minimum: 0
+        maximum: 1
+```
+
+We recommend using our [TypeScript SDK](https://github.com/smithery-ai/sdk) to create HTTP-based MCP servers.
+
+#### STDIO Server Configuration
+
+```yaml
+startCommand:
+  type: stdio
+  configSchema: object
+  commandFunction: string
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | string | Must be set to `"stdio"` for standard I/O based MCP servers |
+| `configSchema` | object | JSON Schema defining the configuration options for your server. Smithery uses this to validate user configurations before starting your server. |
+| `commandFunction` | string | A JavaScript function that returns the command, arguments and environment variables required to start your server. See details below. |
+
+#### commandFunction Details
+
+This JavaScript function receives a validated `config` object and must return an object with the following properties:
+
+```js
+(config) => ({
+  command: string, // The command to execute
+  args: string[],  // Array of command arguments
+  env: object      // Environment variables as key-value pairs
+})
+```
+
+You can trust that the `config` parameter conforms to your defined `configSchema`.
+
+### build (Optional)
+**Type**: Object
+
+Contains build configuration options for your server.
+
+```yaml
+build:
+  dockerfile: string
+  dockerBuildPath: string
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `dockerfile` | string | Path to Dockerfile, relative to the smithery.yaml file |
+| `dockerBuildPath` | string | Path to docker build context, relative to the smithery.yaml file |

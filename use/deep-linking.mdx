@@ -1,0 +1,131 @@
+---
+title: 'Integration with Deep Links'
+description: 'Deep links provide a seamless way to integrate Smithery MCPs into supported clients.'
+---
+
+# Integration with Deep Links
+
+Deep links provide a seamless way to integrate Smithery MCPs into supported clients. 
+When a user clicks a deep link from our server page, the client automatically configures the MCP with the correct settings.
+
+To get started with integration, please contact us at contact@smithery.ai or join our [Discord community](https://discord.gg/sKd9uycgH9) for support.
+
+![Magic Link Integration Flow](/images/magic_link_flow.png)
+
+## Protocol Specification
+
+Deep links use the following URL format:
+```typescript
+`${clientScheme}:mcp/install?${encodeURIComponent(config)}`
+
+// Example:
+// vscode:mcp/install?<url-encoded-json-config>
+```
+
+The `config` parameter contains a URL-encoded JSON object with the following schema:
+
+```typescript
+interface StdioMCPConfig {
+  name: string;    // Qualified name of the MCP server
+  type: "stdio";
+  command: string; // Example: "npx"
+  args: string[];  // Command line arguments for the MCP CLI
+}
+
+// Note: The configuration does not require an "env" field because
+// Smithery automatically handles sensitive data through saved configurations.
+
+interface HttpMCPConfig {
+  name: string;   // Qualified name of the MCP server
+  type: "http";
+  url: string;    // URL of the MCP server
+}
+
+type MCPConfig = StdioMCPConfig | HttpMCPConfig;
+```
+
+The configuration fields are detailed in the table below:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| name | Name of the server (required for all types) | `"Desktop Commander"` |
+| type | Server connection type | `"stdio"` or `"http"` |
+| command | Command to start the server executable (required for stdio type). The command needs to be available on your system path or contain its full path. | `"npx"` |
+| args | Array of arguments passed to the command (required for stdio type). | `["-y", "@smithery/cli@latest", "run", "@wonderwhy-er/desktop-commander"]` |
+| url | URL of the MCP server (required for http type) | `"https://server.smithery.ai/exa/mcp"` |
+
+## Example Configurations
+
+### stdio-based Configuration:
+```json
+{
+  "name": "Desktop Commander",
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@smithery/cli@latest", "run", "@wonderwhy-er/desktop-commander"]
+}
+```
+
+### HTTP-based Configuration:
+```json
+{
+  "name": "Exa Search",
+  "type": "http",
+  "url": "https://server.smithery.ai/exa/mcp"
+}
+```
+
+## Handling Deep links
+
+When your client receives a deeplink:
+
+1. Parse the URL-encoded config parameter using `decodeURIComponent`
+2. Parse the resulting string as JSON
+3. Create the transport with provided arguments
+
+Example implementation:
+
+### Deeplink Handler
+
+```typescript
+// Parse deeplink and return config
+function handleMagicLink(url: string) {
+  const configStr = url.split('?')[1]
+  return JSON.parse(decodeURIComponent(configStr))
+}
+```
+
+### Stdio Example
+
+```typescript
+// Example with stdio transport
+async function setupStdioMCP(url: string) {
+  const config = handleDeepLink(url)
+  const transport = new StdioClientTransport({
+    command: config.command,
+    args: config.args
+  })
+  
+  const client = new Client({ name: "Test client" })
+  await client.connect(transport)
+  return client
+}
+```
+
+### HTTP Example
+
+```typescript
+// Example with HTTP transport
+async function setupHttpMCP(url: string) {
+  const config = handleDeepLink(url)
+  const transport = new StreamableHTTPClientTransport(config.url)
+  
+  const client = new Client({ name: "Test client" })
+  await client.connect(transport)
+  return client
+}
+```
+
+## Try It Out
+
+You can test your client configuration using the interactive tool on the Smithery website. Simply modify the configuration and click "Generate deeplink" to create a deeplink that you can test with your client.

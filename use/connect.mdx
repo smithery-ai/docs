@@ -1,0 +1,109 @@
+---
+title: 'Connect to MCPs'
+description: 'Learn how to connect to MCP servers using the Smithery platform.'
+---
+
+# Connect to MCPs
+
+## Prerequisites
+
+Before you start connecting to MCPs, make sure you have:
+
+1. Installed the required packages:
+   ```bash
+   npm install @modelcontextprotocol/sdk @smithery/sdk
+   ```
+2. A Smithery API key (get one from your [Smithery Dashboard](https://smithery.ai/account/api-keys))
+3. Node.js version 18 or higher installed
+
+## Connection Steps
+
+### Using a Profile (Recommended)
+
+If you have saved your server configuration in a [Smithery profile](https://smithery.ai/account/profiles), you can connect directly using the profile ID:
+
+```typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+
+const profileId = "your-profile-id"
+const apiKey = "your-api-key"
+const serverName = "server-name"
+
+const transport = new StreamableHTTPClientTransport(
+  `https://server.smithery.ai/${serverName}/mcp?profile=${profileId}&api_key=${apiKey}`
+)
+
+// Create and configure the client
+const client = new Client({
+  name: "Test Client",
+  version: "1.0.0"
+})
+
+// Connect to the MCP
+await client.connect(transport)
+```
+
+### Manual Configuration
+
+You can set up the connection manually:
+
+#### 1. Get Server Details
+
+First, get the server details from the Registry API to understand its configuration requirements:
+
+```typescript
+// Get server details from registry - note the @ prefix in the qualified name
+const qualifiedName = '@browserbasehq/mcp-browserbase'
+const response = await fetch(
+  `https://registry.smithery.ai/servers/${qualifiedName}`,
+  {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Accept': 'application/json'
+    }
+  }
+);
+
+const serverInfo = await response.json();
+// Find the HTTP connection type
+const httpConnection = serverInfo.connections.find(c => c.type === 'http');
+if (!httpConnection) {
+  throw new Error('HTTP connection not available');
+}
+
+const configSchema = httpConnection.configSchema;
+// Example config based on the schema
+const config = {
+  browserbaseApiKey: "your-browserbase-api-key",    // Required: API key for authentication
+  browserbaseProjectId: "your-project-id"           // Required: Your Browserbase project ID
+}
+```
+
+See the [Registry API](/use/registry) documentation for more details on searching and retrieving servers.
+
+#### 2. Create Connection
+
+```typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { createSmitheryUrl } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+
+// Create the server URL with your config and API key
+const url = createSmitheryUrl(serverUrl, config, apiKey)
+
+// Create transport
+const transport = new StreamableHTTPClientTransport(url)
+
+// Create and configure the client
+const client = new Client({
+  name: "browserbase client",
+  version: "1.0.0"
+})
+
+// Connect to the MCP
+await client.connect(transport)
+```
+
+## Limits
+Remote connections through the Smithery gateway are limited to 10 free concurrent sessions per account

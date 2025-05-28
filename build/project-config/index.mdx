@@ -1,0 +1,64 @@
+---
+title: 'Project Configuration'
+description: 'Learn how to configure your project for deployment on Smithery.'
+---
+
+# Project Configuration
+
+This guide explains how to configure your project for deployment on Smithery. Your project configuration tells us how to deploy your server and should live in the base of your repository. They are not the same as [session configurations](/use/session-config) that clients pass to initialize a new session on your server.
+
+## Concepts
+
+### Configuration Files
+There are two required configuration files that tell Smithery how to build and run your server:
+
+1. **Dockerfile**: Defines how to build your server's container image
+2. **smithery.yaml**: Specifies how to start and run your server
+
+### Automatic Setup
+Smithery will attempt to automatically generate a pull-request with these files when you trigger a deployment. However, in some cases, the setup can fail and you may need to set this up manually.
+
+## Required Files
+
+### Dockerfile
+The Dockerfile tells us how to build your server. It should be placed in the root of your project or in the subdirectory containing your MCP server.
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY . .
+RUN pip install -r requirements.txt
+
+CMD ["python", "server.py"]
+```
+
+### smithery.yaml
+The smithery.yaml file tells us how to start your server. It should be placed alongside your Dockerfile.
+
+```yaml
+version: 1
+start:
+  command: ["python", "server.py"]
+  port: 8000
+```
+
+## Project Structure
+
+### Subdirectories
+If your package is not in the root directory of your repository (in the case of a monorepo), you should place your Dockerfile and `smithery.yaml` in the subdirectory that contains your package. You will need to specify the base directory in your server settings on Smithery.
+
+For example, if your MCP server is in the `packages/mcp-server` directory:
+
+1. Place your `Dockerfile` and `smithery.yaml` in the `packages/mcp-server` directory
+2. Set the base directory to `packages/mcp-server` in your server settings under Github integration
+
+## Best Practices
+
+1. **Testing**: Test your MCP server locally before deploying using [MCP Inspector](https://github.com/modelcontextprotocol/inspector). Please ensure your Dockerfile builds locally first before deploying.
+2. **Configuration**: Use the `configSchema` to properly define and validate your server's configuration options
+3. **Docker Optimization**: Keep your Docker image size minimal by using appropriate base images and multi-stage builds
+
+## Next Steps
+
+Once you have configured your project, you can [deploy your server](/build/deployments).

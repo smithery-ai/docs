@@ -1,0 +1,170 @@
+---
+title: 'Session Configuration'
+description: 'Smithery allows clients to connect to MCP servers with a specific configuration.'
+---
+
+# Session Configuration
+
+Smithery allows clients to connect to MCP servers with a specific configuration. Configurations are JSON objects that customize how an MCP server behaves for a specific client connection. Configurations allow each client-server session to operate differently.
+
+## How Configurations Work
+
+Every MCP server can define what configuration parameters it accepts. These parameters might include API keys, model settings, temperature values, or any other options that affect how the server responds to requests.
+
+<Info>
+  Configurations are bound to individual sessions. Each client connection has its own configuration that doesn't affect other sessions.
+</Info>
+
+## How Configs Are Declared
+
+Session configurations are defined by the author of the MCP.
+MCP server developers define their configuration requirements using JSON Schema in the `configSchema` field of their [`smithery.yaml`](/build/project-config/smithery-yaml) file:
+
+```yaml smithery.yaml
+startCommand:
+    type: stdio
+    configSchema:
+      type: object
+      required: ["openaiApiKey"]
+      properties:
+        openaiApiKey:
+          type: string
+          title: "OpenAI API Key"
+          description: "Your OpenAI API key"
+        modelName:
+          type: string
+          title: "Model Name"
+          default: "gpt-4"
+          enum: ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
+        temperature:
+          type: number
+          title: "Temperature"
+          description: "Controls randomness of output"
+          default: 0.7
+          minimum: 0
+          maximum: 1
+```
+
+The `configSchema` supports all standard JSON Schema features:
+- Data types (`string`, `number`, `boolean`, etc.)
+- Required fields
+- Default values
+- Enumerated options
+- Min/max constraints
+- Descriptive titles and documentation
+
+The schema is used to both validate configurations and generate user interfaces in the Smithery web app.
+
+## Supplying Configs at Connection Time
+
+When connecting to an MCP server, clients must provide a configuration that satisfies the server's schema. This happens in two steps:
+
+1. **Retrieve the schema**: The [Registry API](/use/registry) returns the `configSchema` as part of the server connection details
+2. **Send the config**: When establishing a connection, encode the configuration as base64 in the `config` query parameter of the [connection URL](/use/connect).
+
+You can also save configurations for reuse with [Configuration Profiles](/use/profiles), which eliminates the need to re-enter configs each time.
+
+## Security
+
+Configurations sometimes contain sensitive information like API keys. It's recommended for users to save sensitive keys on Smithery as [profiles](/use/profiles) to avoid passing them in the connection URL.
+
+## Examples
+
+### Minimal Configuration
+
+If your server doesn't need any configuration, you can use an empty schema:
+
+```yaml smithery.yaml
+  startCommand:
+    type: http
+    configSchema: {}
+    commandFunction: |-
+      (config) => ({
+        "command": "node",
+          "args": ["dist/index.js"],
+          "env": {}
+        })
+```
+
+### Database Connection Configuration
+
+A database connector might require connection details:
+
+```yaml smithery.yaml
+  startCommand:
+    type: stdio
+    configSchema:
+      type: object
+      required: ["connectionString"]
+      properties:
+        connectionString:
+          type: string
+          title: "Connection String"
+          description: "Database connection string"
+        maxConnections:
+          type: integer
+          default: 5
+          minimum: 1
+          maximum: 20
+        debug:
+          type: boolean
+          default: false
+    commandFunction: |-
+      (config) => ({
+        "command": "python",
+        "args": ["-m", "db_connector.main"],
+        "env": {
+          "DB_CONNECTION": config.connectionString,
+          "MAX_CONNECTIONS": config.maxConnections.toString(),
+          "DEBUG": config.debug ? "1" : "0"
+        }
+      })
+```
+
+## Best Practices for MCP Authors
+
+1. **Provide clear documentation**
+   - Use `description` fields in your schema
+   - Document any non-obvious parameters
+
+2. **Set sensible defaults**
+   - Users should be able to connect with minimal configuration
+   - Use the `default` property for optional parameters
+
+3. **Use enums for limited choices**
+   - When there are specific valid options, list them in an `enum`
+   - This creates a dropdown in the UI instead of a free text field
+
+4. **Handle configuration securely**
+   - Pass secrets as environment variables
+   - Never log or expose configuration values
+   - Validate input server-side even though Smithery performs validation
+
+5. **Keep configurations small**
+   - Focus on essential parameters
+   - Large binary data should not be passed via configuration
+
+## Troubleshooting
+
+### What happens if my configuration is invalid?
+
+If a configuration doesn't match the schema, Smithery will reject the connection attempt and provide an error message explaining what's wrong.
+
+### Can I change configuration mid-session?
+
+No, configurations are bound to a session at connection time and cannot be changed during the session. To use a different configuration, establish a new connection.
+
+### Can configurations be optional?
+
+Yes, by not including fields in the `required` array of your schema, those fields become optional. You can also provide default values using the `default` property.
+
+### Where can I find a server's configuration schema?
+
+You can view any MCP server's configuration schema in its API Tab on the server page. It provides a clean, syntax-highlighted code block of the raw JSON schema for easy reference and copying.
+
+## See Also
+
+- [Configuration Profiles](/use/profiles) - Save and reuse configurations
+- [Registry API](/use/registry) - Programmatically access server information
+- [Project Configuration](/build/project-config) - How to define server configuration in `smithery.yaml`
+- [JSON Schema Documentation](https://json-schema.org/understanding-json-schema/) - Learn more about JSON Schema
