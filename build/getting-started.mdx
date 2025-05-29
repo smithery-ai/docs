@@ -180,14 +180,54 @@ export function createStatefulServer({ sessionId, config }) { ... }
 
 ### Build for Production
 
+The Smithery CLI supports building servers for different transport protocols:
+
+#### SHTTP Transport (Default)
+SHTTP (Server-Sent Events over HTTP) is ideal for web-based applications and services that need HTTP connectivity:
+
 ```bash
 npx @smithery/cli build
+# or explicitly specify shttp
+npx @smithery/cli build --transport shttp
+```
+
+#### STDIO Transport
+STDIO transport is perfect for command-line tools and desktop applications that communicate via standard input/output:
+
+```bash
+npx @smithery/cli build --transport stdio
+```
+
+#### Custom Entry Point & Output
+
+```bash
+# Build with custom entry file
+npx @smithery/cli build src/my-server.ts
+```
+
+By default, the CLI reads your entry point from the `"module"` field in `package.json`:
+
+```json
+{
+  "name": "my-mcp-server",
+  "module": "./src/index.ts"
+}
 ```
 
 Creates `.smithery/index.cjs` - a bundled, production-ready server.
 
 ### Test Built Server
 
+#### SHTTP Server
 ```bash
 node .smithery/index.cjs
+# Server starts on http://localhost:8181
 ```
+
+#### STDIO Server
+```bash
+# Test with configuration
+node .smithery/index.cjs apiKey=your-key debug=true
+
+# Or provide config as JSON
+echo '{"method": "initialize", "params": {}}' | node .smithery/index.cjs
