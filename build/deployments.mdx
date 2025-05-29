@@ -27,7 +27,7 @@ If you prefer to implement the server yourself without using our SDK, you should
 There are a few Smithery-specified details you should be aware of:
 
 1. The `/mcp` endpoint MUST be available and will be used to process `GET`, `POST` and `DELETE` requests as part of the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) specification.
-2. If your server requires configuration, we MUST pass the [configuration object](/use/session-config) to your server as a query parameter: `/mcp?config={...}` in base64 encoding.
+2. If your server requires configuration, we MUST pass the [configuration object](/use/session-config) to your server as a query parameter using dot-notation: `/mcp?server.host=localhost&server.port=8080&debug=true`.
 
 ### STDIO
 **This is deprecated.**
