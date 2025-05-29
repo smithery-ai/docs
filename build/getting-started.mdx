@@ -176,14 +176,14 @@ export function createStatelessServer({ config }) { ... }
 export function createStatefulServer({ sessionId, config }) { ... }
 ```
 
-## Building & Deployment
+## Building
 
 ### Build for Production
 
 The Smithery CLI supports building servers for different transport protocols:
 
 #### SHTTP Transport (Default)
-SHTTP (Server-Sent Events over HTTP) is ideal for web-based applications and services that need HTTP connectivity:
+SHTTP (Streamable HTTP) is ideal for web-based applications and services that need HTTP connectivity:
 
 ```bash
 npx @smithery/cli build
@@ -228,6 +228,3 @@ node .smithery/index.cjs
 ```bash
 # Test with configuration
 node .smithery/index.cjs apiKey=your-key debug=true
-
-# Or provide config as JSON
-echo '{"method": "initialize", "params": {}}' | node .smithery/index.cjs
