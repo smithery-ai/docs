@@ -1,0 +1,1305 @@
+---
+title: "AI Prompt"
+description: "Prompt to give any AI agent full context of Smithery"
+---
+
+# AI Prompt
+
+Copy this prompt to give any AI agent full context of Smithery. Works with ChatGPT, Claude, Cursor, and more.
+
+```markdown
+# Introduction
+
+> Smithery is a platform to help developers find and ship AI-native services designed to communicate with AI agents.
+
+# Introduction
+
+Smithery is a platform to help developers find and ship AI-native services designed to communicate with AI agents. All our listed services follow the [Model Context Protocols (MCP)](#model-context-protocol) specification. Our mission is to accelerate agentic AI by making agentic services accessible.
+
+Smithery provides:
+
+- A centralized hub for discovering MCP servers
+- Hosting and distribution for MCP servers
+- Standardized interfaces for tool integration and configs
+
+## Quick Start
+
+<CardGroup>
+    <Card title="Use MCP Servers" icon="hammer" href="/use">
+        Learn how to integrate Smithery MCP servers into your apps and agents
+    </Card>
+
+<Card title="Build MCP Servers" icon="anvil" href="/build">
+        Create and deploy your own MCP servers to Smithery
+    </Card>
+</CardGroup>
+
+<Tip>
+    Install the <a href="https://smithery.ai/server/@upstash/context7-mcp" target="_blank">Context7 MCP server</a> and use this prompt:
+
+`` \`
+    /context7 get docs for smithery/sdk
+     ``\`
+
+![Context7 Smithery Integration](https://mintlify.s3.us-west-1.amazonaws.com/smithery/images/context7-smithery.png)
+</Tip>
+
+## Model Context Protocol
+
+The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is an open protocol that enables seamless integration between LLMs and external data sources and tools. It is a universal standard for connecting AI systems with the context they need, eliminating information silos and fragmented integrations.
+
+By providing a standard way to connect AI systems with data sources, MCP simplifies the development and maintenance of agentic applications. This makes it easier to build agents like intelligent IDEs, chat interfaces and custom AI workflows.
+
+Instead of writing custom implementations for each new data source, developers can use MCP as a single, standardized protocol. This approach not only makes systems more maintainable but also ensures better scalability as your AI applications grow and evolve.
+
+———————————————————————————————————————————————
+
+# Use MCPs
+
+> This guide explains how to integrate Smithery into your application (MCP Client).
+
+# Introduction
+
+This guide explains how to integrate Smithery into your application (MCP Client).
+
+**Benefits of using Smithery:**
+
+- Access a large catalog of MCP servers through a single gateway
+- No need to manage auth secrets and configurations
+
+## Integration Approaches
+
+At a high-level, there are two main ways to integrate Smithery with your client application:
+
+### 1. Direct User Authentication (Simpler)
+
+With this simpler approach, users authenticate directly with Smithery:
+
+- When needed, your application redirects users to create their own Smithery accounts
+- Smithery handles storing auth secrets and configurations for the user
+- Your client only needs the user's Smithery API key to establish connections
+
+**Benefits:**
+
+- Simpler implementation for client developers
+- Reduced security burden on your application
+- Users can reuse their configurations across multiple clients
+
+### 2. White-Label Integration
+
+With this approach, your application authenticates with Smithery under your developer account and proxies user connections:
+
+- Your application manages user secrets and configurations
+- You authenticate with Smithery using your developer credentials
+- You send user configurations with each connection request
+
+**Benefits:**
+
+- Fully white-labeled experience within your application
+- Complete control over the user experience
+- No need for users to create Smithery accounts
+
+**Considerations:**
+
+- More complex implementation
+- Your application must securely store user secrets
+- You must send configuration with each connection request
+
+————————————————————————————————————————————————
+
+# Registry API
+
+> The Smithery Registry API provides a programmatic way to search for MCP servers.
+
+# Registry API
+
+The Smithery Registry API provides a programmatic way to search for MCP servers. This documentation will walk you through using the Registry API to obtain a remote MCP server.
+
+## Concepts
+
+Our registry contains an index of MCP servers. Every server may have different ways of launching or connecting to them. Server authors specify a [configuration schema](/build/project-config), which is a JSON schema that defines the structure of the configuration that is required to connect to the server.
+
+## Authentication
+
+All endpoints require authentication via a bearer token. You can create an API key [here](https://smithery.ai/account/api-keys).
+
+Include the following header in your API requests:
+
+`` \`typescript
+headers: {
+    'Authorization': 'Bearer smithery-api-token'
+}
+ ``\`
+
+## List Servers
+
+`` \`http
+GET https://registry.smithery.ai/servers
+ ``\`
+
+Retrieves a paginated list of all available servers.
+
+#### Query Parameters
+
+- `q` (optional): Search query. We use semantic search, so treat this as a prompt.
+- `page` (optional): Page number for pagination (default: 1)
+- `pageSize` (optional): Number of items per page (default: 10)
+
+#### Filtering
+
+- **Text Search**: Simply type any text to search semantically (e.g., `machine learning`)
+- **Owner Filter**: Use `owner:username` to filter by repository owner (e.g., `owner:smithery-ai`)
+- **Repository Filter**: Use `repo:repository-name` to filter by repository name (e.g., `repo:fetch`)
+- **Deployment Status**: Use `is:deployed` to show only deployed servers
+- **Verification Status**: Use `is:verified` to show only verified servers
+
+You can combine multiple filters together. For example:
+
+`` \`text
+owner:mem0ai is:verified memory
+ ``\`
+
+#### Example Request
+
+<Tabs>
+    <Tab title="JavaScript">
+        ``\`javascript
+        // JavaScript example using fetch
+        const apiKey = 'your-smithery-api-token';
+        const query = 'owner:mem0ai is:verified memory';
+        const encodedQuery = encodeURIComponent(query);
+
+const response = await fetch(
+            `https://registry.smithery.ai/servers?q=${encodedQuery}&page=1&pageSize=10`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+const data = await response.json();
+        console.log(data);
+        ``\`
+    </Tab>
+
+<Tab title="Python">
+        ``\`python
+        # Python example using requests
+        import requests
+        from urllib.parse import quote
+
+api_key = 'your-smithery-api-token'
+        query = 'owner:mem0ai is:verified memory'
+        encoded_query = quote(query)
+
+response = requests.get(
+                f'https://registry.smithery.ai/servers?q={encoded_query}&page=1&pageSize=10',
+                headers={
+                        'Authorization': f'Bearer {api_key}',
+                        'Accept': 'application/json'
+                }
+        )
+
+data = response.json()
+        print(data)
+        ``\`
+    </Tab>
+
+<Tab title="Bash">
+        `` \`bash
+        # Using cURL
+        curl -X GET "https://registry.smithery.ai/servers?q=owner:mem0ai%20is:verified%20memory&page=1&pageSize=10" \
+            -H "Authorization: Bearer your-smithery-api-token" \
+            -H "Accept: application/json"
+         ``\`
+    </Tab>
+</Tabs>
+
+#### Response Type
+
+`` \`typescript
+{
+        servers: Array<{
+            qualifiedName: string;
+            displayName: string;
+            description: string;
+            // Link to Smithery server page
+            homepage: string;
+            // Number of times the server has been used via tool calling
+            useCount: string;
+            // True if this server is deployed on Smithery as a HTTP server
+            isDeployed: boolean
+            createdAt: string;
+        }>;
+        pagination: {
+            currentPage: number;
+            pageSize: number;
+            totalPages: number;
+            totalCount: number;
+        };
+    }
+ ``\`
+
+The response includes basic information about each server and pagination details to help you navigate through the list of servers.
+
+## Get Server
+
+`` \`http
+GET https://registry.smithery.ai/servers/{qualifiedName}
+ ``\`
+
+Retrieves information about a specific server by its qualified name. The qualified name is a unique human-readable identifier for the server. You can find the qualified name from the server page's url: `https://smithery.ai/server/{qualifiedName}`.
+
+#### Example Request
+
+<Tabs>
+    <Tab title="JavaScript">
+        ``\`javascript
+        // JavaScript example using fetch
+        const apiKey = 'your-smithery-api-token';
+        const qualifiedName = 'exa';
+
+const response = await fetch(
+            `https://registry.smithery.ai/servers/${qualifiedName}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+const data = await response.json();
+        console.log(data);
+        ``\`
+    </Tab>
+
+<Tab title="Python">
+        ``\`python
+        # Python example using requests
+        import requests
+
+api_key = 'your-smithery-api-token'
+        qualified_name = 'exa'
+
+response = requests.get(
+                f'https://registry.smithery.ai/servers/{qualified_name}',
+                headers={
+                        'Authorization': f'Bearer {api_key}',
+                        'Accept': 'application/json'
+                }
+        )
+
+data = response.json()
+        print(data)
+        ``\`
+    </Tab>
+
+<Tab title="Bash">
+        `` \`bash
+        # Using cURL
+        curl -X GET "https://registry.smithery.ai/servers/exa" \
+            -H "Authorization: Bearer your-smithery-api-token" \
+            -H "Accept: application/json"
+         ``\`
+    </Tab>
+</Tabs>
+
+#### Response Type
+
+`` \`typescript
+{
+        qualifiedName: string;
+        displayName: string;
+        iconUrl: string | null;
+        deploymentUrl: string;
+        connections: Array<{
+            type: string;
+            url?: string;
+            configSchema: JSONSchema;
+        }>;
+        security: {
+            scanPassed: boolean;
+        } | null;
+        tools: Array<{
+            name: string;
+            description: string | null;
+            inputSchema: {
+                type: "object";
+                properties?: object;
+            };
+            // And potentially other properties of the Tool object
+        }> | null;
+}
+ ``\`
+
+The response contains a comprehensive record of the server, including connection details and security information.
+
+### Properties
+
+#### name
+
+**Type**: `string`
+
+Qualified name of the MCP server in the format `owner/repository`.
+
+#### displayName
+
+**Type**: `string`
+
+Human-readable name of the MCP server.
+
+#### iconUrl
+
+**Type**: `string | null`
+
+URL to the server's icon image, or `null` if no icon is available.
+
+#### connections
+
+**Type**: `Array`
+
+Specifies how to connect to this server. Each object in the array represents a different connection method.
+
+| Property                 | Type          | Description                                                                                    |
+| ------------------------ | ------------- | ---------------------------------------------------------------------------------------------- |
+| `type`                   | `string`      | Connection type. Either `"http"` or `"stdio"`.                                                 |
+| `url`                    | `string`      | HTTP URL to connect to (for `http` type).                                                      |
+| `configSchema`           | `object`      | JSON Schema defining required configuration options.                                           |
+
+#### security
+
+**Type**: `object`
+
+Information about the server's security status.
+
+| Property          | Type                                | Description                                                                                                                                                    |
+| ----------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scanPassed`      | `boolean` \| `null`                 | Whether the server has passed security checks. `null` if no scan has been performed.                                                                           |
+
+<Info>
+    We use [Invariant](https://invariantlabs.ai/blog/introducing-mcp-scan) to scan for tool poisoning, rug pulls, cross-origin escalations, and prompt injection attacks.
+</Info>
+
+#### tools
+
+**Type**: `Array | null`
+
+List of tools that this server provides, or `null` if no tools have been retrieved.
+
+| Property              | Type          | Description                                                                                                |
+| --------------------- | ------------- | ---------------------------------------------------------------------------------------------------------- |
+| `name`                | `string`      | Name of the tool.                                                                                          |
+| `description`         | `string`      | Description of the tool.                                                                                   |
+| `inputSchema`         | `object`      | JSON Schema defining the required parameters for the tool.                                                 |
+
+<Note>
+    Tool information is cached from the server's last deployment. The actual tools returned by the MCP server at runtime may differ based on configuration or server updates.
+</Note>
+
+## Next Step
+
+Once you have retrieved a server and its connection details, you can connect to it using the [Connect to MCPs](/use/connect) guide.
+
+————————————————————————————————————————————————
+
+# Connect to MCPs
+
+> Learn how to connect to MCP servers using the Smithery platform.
+
+# Connect to MCPs
+
+## Prerequisites
+
+Before you start connecting to MCPs, make sure you have:
+
+1. Installed the required packages:
+         `` \`bash
+      npm install @modelcontextprotocol/sdk @smithery/sdk
+       ``\`
+2. A Smithery API key (get one from your [Smithery Dashboard](https://smithery.ai/account/api-keys))
+3. Node.js version 18 or higher installed
+
+## Connection Steps
+
+### Using a Profile (Recommended)
+
+If you have saved your server configuration in a [Smithery profile](https://smithery.ai/account/profiles), you can connect directly using the profile ID:
+
+``\`typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+
+const profileId = "your-profile-id"
+const apiKey = "your-api-key"
+const serverName = "server-name"
+
+const transport = new StreamableHTTPClientTransport(
+    `https://server.smithery.ai/${serverName}/mcp?profile=${profileId}&api_key=${apiKey}`
+)
+
+// Create and configure the client
+const client = new Client({
+    name: "Test Client",
+    version: "1.0.0"
+})
+
+// Connect to the MCP
+await client.connect(transport)
+``\`
+
+### Manual Configuration
+
+You can set up the connection manually:
+
+#### 1. Get Server Details
+
+First, get the server details from the Registry API to understand its configuration requirements:
+
+``\`typescript
+// Get server details from registry - note the @ prefix in the qualified name
+const qualifiedName = '@browserbasehq/mcp-browserbase'
+const response = await fetch(
+    `https://registry.smithery.ai/servers/${qualifiedName}`,
+    {
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': 'application/json'
+        }
+    }
+);
+
+const serverInfo = await response.json();
+// Find the HTTP connection type
+const httpConnection = serverInfo.connections.find(c => c.type === 'http');
+if (!httpConnection) {
+    throw new Error('HTTP connection not available');
+}
+
+const configSchema = httpConnection.configSchema;
+// Example config based on the schema
+const config = {
+    browserbaseApiKey: "your-browserbase-api-key",        // Required: API key for authentication
+    browserbaseProjectId: "your-project-id"                      // Required: Your Browserbase project ID
+}
+``\`
+
+See the [Registry API](/use/registry) documentation for more details on searching and retrieving servers.
+
+#### 2. Create Connection
+
+``\`typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { createSmitheryUrl } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+
+// Create the server URL with your config and API key
+const url = createSmitheryUrl(serverUrl, config, apiKey)
+
+// Create transport
+const transport = new StreamableHTTPClientTransport(url)
+
+// Create and configure the client
+const client = new Client({
+    name: "browserbase client",
+    version: "1.0.0"
+})
+
+// Connect to the MCP
+await client.connect(transport)
+``\`
+
+## Limits
+
+Remote connections through the Smithery gateway are limited to 10 free concurrent sessions per account
+
+————————————————————————————————————————————————
+
+# Session Configuration
+
+> Smithery allows clients to connect to MCP servers with a specific configuration.
+
+# Session Configuration
+
+Smithery allows clients to connect to MCP servers with a specific configuration. Configurations are JSON objects that customize how an MCP server behaves for a specific client connection. Configurations allow each client-server session to operate differently.
+
+## How Configurations Work
+
+Every MCP server can define what configuration parameters it accepts. These parameters might include API keys, model settings, temperature values, or any other options that affect how the server responds to requests.
+
+<Info>
+    Configurations are bound to individual sessions. Each client connection has its own configuration that doesn't affect other sessions.
+</Info>
+
+## How Configs Are Declared
+
+Session configurations are defined by the author of the MCP.
+MCP server developers define their configuration requirements using JSON Schema in the `configSchema` field of their [`smithery.yaml`](/build/project-config/smithery-yaml) file:
+
+`` \`yaml smithery.yaml
+startCommand:
+        type: stdio
+        configSchema:
+            type: object
+            required: ["openaiApiKey"]
+            properties:
+                openaiApiKey:
+                    type: string
+                    title: "OpenAI API Key"
+                    description: "Your OpenAI API key"
+                modelName:
+                    type: string
+                    title: "Model Name"
+                    default: "gpt-4"
+                    enum: ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
+                temperature:
+                    type: number
+                    title: "Temperature"
+                    description: "Controls randomness of output"
+                    default: 0.7
+                    minimum: 0
+                    maximum: 1
+ ``\`
+
+The `configSchema` supports all standard JSON Schema features:
+
+- Data types (`string`, `number`, `boolean`, etc.)
+- Required fields
+- Default values
+- Enumerated options
+- Min/max constraints
+- Descriptive titles and documentation
+
+The schema is used to both validate configurations and generate user interfaces in the Smithery web app.
+
+## Supplying Configs at Connection Time
+
+When connecting to an MCP server, clients must provide a configuration that satisfies the server's schema. This happens in two steps:
+
+1. **Retrieve the schema**: The [Registry API](/use/registry) returns the `configSchema` as part of the server connection details
+2. **Send the config**: When establishing a connection, provide the configuration using dot-notation query parameters in the [connection URL](/use/connect). For example, `?server.host=localhost&server.port=8080&debug=true`.
+
+#### Reserved Parameters
+
+The following parameters are reserved and won't be passed to servers:
+
+- `api_key` (Smithery authentication)
+- `profile` (saved configuration profiles)
+
+You can also save configurations for reuse with [Configuration Profiles](/use/profiles), which eliminates the need to re-enter configs each time.
+
+## Security
+
+Configurations sometimes contain sensitive information like API keys. It's recommended for users to save sensitive keys on Smithery as [profiles](/use/profiles) to avoid passing them in the connection URL.
+
+## Examples
+
+### Minimal Configuration
+
+If your server doesn't need any configuration, you can use an empty schema:
+
+`` \`yaml smithery.yaml
+    startCommand:
+        type: http
+        configSchema: {}
+        commandFunction: |-
+            (config) => ({
+                "command": "node",
+                    "args": ["dist/index.js"],
+                    "env": {}
+                })
+ ``\`
+
+### Database Connection Configuration
+
+A database connector might require connection details:
+
+`` \`yaml smithery.yaml
+    startCommand:
+        type: stdio
+        configSchema:
+            type: object
+            required: ["connectionString"]
+            properties:
+                connectionString:
+                    type: string
+                    title: "Connection String"
+                    description: "Database connection string"
+                maxConnections:
+                    type: integer
+                    default: 5
+                    minimum: 1
+                    maximum: 20
+                debug:
+                    type: boolean
+                    default: false
+        commandFunction: |-
+            (config) => ({
+                "command": "python",
+                "args": ["-m", "db_connector.main"],
+                "env": {
+                    "DB_CONNECTION": config.connectionString,
+                    "MAX_CONNECTIONS": config.maxConnections.toString(),
+                    "DEBUG": config.debug ? "1" : "0"
+                }
+            })
+ ``\`
+
+## Best Practices for MCP Authors
+
+1. **Provide clear documentation**
+         _ Use `description` fields in your schema
+         _ Document any non-obvious parameters
+
+2. **Set sensible defaults**
+         _ Users should be able to connect with minimal configuration
+         _ Use the `default` property for optional parameters
+
+3. **Use enums for limited choices**
+         _ When there are specific valid options, list them in an `enum`
+         _ This creates a dropdown in the UI instead of a free text field
+
+4. **Handle configuration securely**
+         _ Pass secrets as environment variables
+         _ Never log or expose configuration values
+         \* Validate input server-side even though Smithery performs validation
+
+5. **Keep configurations small**
+         _ Focus on essential parameters
+         _ Large binary data should not be passed via configuration
+
+## Troubleshooting
+
+### What happens if my configuration is invalid?
+
+If a configuration doesn't match the schema, Smithery will reject the connection attempt and provide an error message explaining what's wrong.
+
+### Can I change configuration mid-session?
+
+No, configurations are bound to a session at connection time and cannot be changed during the session. To use a different configuration, establish a new connection.
+
+### Can configurations be optional?
+
+Yes, by not including fields in the `required` array of your schema, those fields become optional. You can also provide default values using the `default` property.
+
+### Where can I find a server's configuration schema?
+
+You can view any MCP server's configuration schema in its API Tab on the server page. It provides a clean, syntax-highlighted code block of the raw JSON schema for easy reference and copying.
+
+## See Also
+
+- [Configuration Profiles](/use/profiles) - Save and reuse configurations
+- [Registry API](/use/registry) - Programmatically access server information
+- [Project Configuration](/build/project-config) - How to define server configuration in `smithery.yaml`
+- [JSON Schema Documentation](https://json-schema.org/understanding-json-schema/) - Learn more about JSON Schema
+
+————————————————————————————————————————————————
+
+# Configuration Profiles
+
+> Learn how to use configuration profiles to group session configurations and supply them to your AI agents.
+
+# Configuration Profiles
+
+<Info>
+    Profiles are currently under active development. We'd love to hear your feedback and suggestions in our <a href="https://discord.gg/Afd38S5p9A">Discord community</a>!
+</Info>
+
+Configuration profiles (or **profiles** for short) are a way for you to group [session configurations](/use/session-config) and supply them to your AI agents.
+Think of it like login profiles in your desktop, which let you decide what applications are installed and what accesses a user has in your computer.
+In a similar way, profiles let you bundle specific servers and their configurations to your agent.
+
+## Examples
+
+Say you're building a coding assistant. A "Coding Assistant" profile could connect Gitingest MCP for code repository access, Memory Tool for storing context, and Context7 for semantic search - giving your agent everything it needs to help with coding tasks.
+
+Instead of managing multiple API keys and configurations separately, profiles let you bundle them together and reuse them across your agents. Here's how it works:
+
+To add servers to your profile, you can:
+
+- From any server page, select the profile you want to add the server to and click "Connect"
+- From Account > Profiles, select your profile and use the "Add Server" search bar shown below
+
+![Profiles View](https://mintlify.s3.us-west-1.amazonaws.com/smithery/images/profiles.png)
+
+## Using Profiles with Individual Servers
+
+When connecting to individual servers, you can use your profile to automatically load the saved configuration:
+
+``\`typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { createSmitheryUrl } from "@smithery/sdk/config.js"
+
+// Get your profile ID from the Smithery Profile page (e.g. "ratty-jay-1nmAzn")
+const profileId = "your-profile-id"
+const apiKey = "your-smithery-api-key"
+
+// Create URL with profile in config
+const url = createSmitheryUrl(
+    "https://server.smithery.ai/gitingest/mcp",
+    { profile: profileId },
+    apiKey
+)
+
+const transport = new StreamableHTTPClientTransport(url)
+
+// Create and configure the client
+const client = new Client({
+    name: "Coding Assistant",
+    version: "1.0.0"
+})
+
+// Connect to the specific MCP server
+await client.connect(transport)
+``\`
+
+## Using Profiles with Toolbox
+
+The [Toolbox](https://smithery.ai/server/@smithery/toolbox) is a special MCP server that can load all tools from your profile at once. This is useful when you want to access all your configured servers in a single connection:
+
+``\`typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { createSmitheryUrl } from "@smithery/sdk/config.js"
+
+// Get your profile ID from the Smithery Profile page (e.g. "ratty-jay-1nmAzn")
+const profileId = "your-profile-id"
+const apiKey = "your-smithery-api-key"
+
+// Create URL with profile in config
+const url = createSmitheryUrl(
+    "https://server.smithery.ai/@smithery/toolbox/mcp",
+    { profile: profileId },
+    apiKey
+)
+
+const transport = new StreamableHTTPClientTransport(url)
+
+// Create and configure the client
+const client = new Client({
+    name: "Coding Assistant",
+    version: "1.0.0"
+})
+
+// Connect to the toolbox - this will load all tools from your profile
+await client.connect(transport)
+``\`
+
+Instead of the typical way where you'd need to specify all configurations:
+
+``\`typescript
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { createSmitheryUrl } from "@smithery/sdk/config.js"
+
+// Configure each server separately with their own API keys and settings
+const exaUrl = createSmitheryUrl(
+    "https://servers.smithery.ai/exa",
+    {
+        config: {
+            api_key: "your-exa-api-key",
+        },
+    }
+)
+const exaTransport = new StreamableHTTPClientTransport(exaUrl)
+
+const zoteroUrl = createSmitheryUrl(
+    "https://servers.smithery.ai/zotero",
+    {
+        config: {
+            api_key: "your-zotero-api-key",
+            library_id: "your-library-id",
+            collection_key: "your-collection",
+        },
+    }
+)
+const zoteroTransport = new StreamableHTTPClientTransport(zoteroUrl)
+
+const pubmedUrl = createSmitheryUrl(
+    "https://servers.smithery.ai/pubmed",
+    {
+        config: {
+            api_key: "your-pubmed-api-key",
+            database: "pubmed",
+            max_results: 10,
+        },
+    }
+)
+const pubmedTransport = new StreamableHTTPClientTransport(pubmedUrl)
+
+// ... and so on for each server you want to connect to
+``\`
+
+Configuration profiles act as a default configuration fallback and makes all saved configuration fields optional. You can still pass configuration fields upon connecting to overwrite the default profile configuration.
+
+Obviously, this is not very useful if you're only connecting to one MCP. It becomes handy when you have multiple MCPs and you don't want to specify configurations for each of them.
+Some MCPs require OAuth, which may have complex configurations. In the future, you can authenticate via the UI on Smithery instead of offloading it to your end users.
+
+———————————————————————————————————————————————
+
+# Integration with Deep Links
+
+> Deep links provide a seamless way to integrate Smithery MCPs into supported clients.
+
+# Integration with Deep Links
+
+Deep links provide a seamless way to integrate Smithery MCPs into supported clients.
+When a user clicks a deep link from our server page, the client automatically configures the MCP with the correct settings.
+
+To get started with integration, please contact us at [contact@smithery.ai](mailto:contact@smithery.ai) or join our [Discord community](https://discord.gg/sKd9uycgH9) for support.
+
+![Magic Link Integration Flow](https://mintlify.s3.us-west-1.amazonaws.com/smithery/images/magic_link_flow.png)
+
+## Protocol Specification
+
+Deep links use the following URL format:
+
+``\`typescript
+`${clientScheme}:mcp/install?${encodeURIComponent(config)}`
+
+// Example:
+// vscode:mcp/install?<url-encoded-json-config>
+``\`
+
+The `config` parameter contains a URL-encoded JSON object with the following schema:
+
+``\`typescript
+interface StdioMCPConfig {
+    name: string;        // Qualified name of the MCP server
+    type: "stdio";
+    command: string; // Example: "npx"
+    args: string[];    // Command line arguments for the MCP CLI
+}
+
+// Note: The configuration does not require an "env" field because
+// Smithery automatically handles sensitive data through saved configurations.
+
+interface HttpMCPConfig {
+    name: string;      // Qualified name of the MCP server
+    type: "http";
+    url: string;        // URL of the MCP server
+}
+
+type MCPConfig = StdioMCPConfig | HttpMCPConfig;
+``\`
+
+The configuration fields are detailed in the table below:
+
+| Field        | Description                                                                                                                                                                                                                                                                              | Example                                                                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| name         | Name of the server (required for all types)                                                                                                                                                                                                                                              | `"Desktop Commander"`                                                                                                                          |
+| type         | Server connection type                                                                                                                                                                                                                                                                   | `"stdio"` or `"http"`                                                                                                                          |
+| command      | Command to start the server executable (required for stdio type). The command needs to be available on your system path or contain its full path.                                                                                                                                        | `"npx"`                                                                                                                                        |
+| args         | Array of arguments passed to the command (required for stdio type).                                                                                                                                                                                                                      | `["-y", "@smithery/cli@latest", "run", "@wonderwhy-er/desktop-commander"]`                                                                     |
+| url          | URL of the MCP server (required for http type)                                                                                                                                                                                                                                           | `"https://server.smithery.ai/exa/mcp"`                                                                                                         |
+
+## Example Configurations
+
+### stdio-based Configuration:
+
+`` \`json
+{
+    "name": "Desktop Commander",
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@smithery/cli@latest", "run", "@wonderwhy-er/desktop-commander"]
+}
+ ``\`
+
+### HTTP-based Configuration:
+
+`` \`json
+{
+    "name": "Exa Search",
+    "type": "http",
+    "url": "https://server.smithery.ai/exa/mcp"
+}
+ ``\`
+
+## Handling Deep links
+
+When your client receives a deeplink:
+
+1. Parse the URL-encoded config parameter using `decodeURIComponent`
+2. Parse the resulting string as JSON
+3. Create the transport with provided arguments
+
+Example implementation:
+
+### Deeplink Handler
+
+`` \`typescript
+// Parse deeplink and return config
+function handleMagicLink(url: string) {
+    const configStr = url.split('?')[1]
+    return JSON.parse(decodeURIComponent(configStr))
+}
+ ``\`
+
+### Stdio Example
+
+``\`typescript
+// Example with stdio transport
+async function setupStdioMCP(url: string) {
+    const config = handleDeepLink(url)
+    const transport = new StdioClientTransport({
+        command: config.command,
+        args: config.args
+    })
+
+const client = new Client({ name: "Test client" })
+    await client.connect(transport)
+    return client
+}
+``\`
+
+### HTTP Example
+
+``\`typescript
+// Example with HTTP transport
+async function setupHttpMCP(url: string) {
+    const config = handleDeepLink(url)
+    const transport = new StreamableHTTPClientTransport(config.url)
+
+const client = new Client({ name: "Test client" })
+    await client.connect(transport)
+    return client
+}
+``\`
+
+————————————————————————————————————————————
+
+# Build MCPs
+
+> Learn how to build your Model Context Protocol (MCP) server on Smithery.
+
+Smithery supports developers building MCPs by providing [CI/CD deployments and hosting](/build/deployments).
+
+**Benefits of hosting:**
+
+- Smithery will show a tool playground on your server page, allowing users to discover and try your MCP online.
+- Users can call your server without installing dependencies or be concerned about security.
+- Smithery will rank hosted servers higher in our search results.
+
+For developers, we provide an [SDK](https://github.com/smithery-ai/sdk/) to make it easier to deploy servers on Smithery.
+
+## Getting Started
+
+**New to building MCPs?** Start with our comprehensive guide:
+
+- **[TypeScript Getting Started Guide](/build/getting-started)** - Complete walkthrough for TypeScript developers using the Smithery CLI `dev` and `build` commands
+
+## Resources
+
+- [Deployments](/build/deployments) - Learn about hosting your MCP servers
+- [Project Configuration](/build/project-config) - Advanced configuration options
+- [Permissions](/build/permissions) - Understanding MCP permissions
+
+———————————————————————————————————————————————
+
+# Deployments
+
+> Learn how to deploy your MCP server on Smithery.
+
+# Deployments
+
+Smithery Deployments allow you to host your MCP server on Smithery served over [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection.
+
+## Overview
+
+Deploying on Smithery is straightforward:
+
+1. [Add your server](/new) to Smithery (or claim it if it's already listed)
+2. Click Deploy on Smithery Deployments tab on your server page (_only authenticated server owners can see this tab_)
+
+That's it! Your MCP server will be built and deployed according to your [project configuration](/build/project-config).
+
+## Supported Transports
+
+We are able to host MCP servers that use the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) and the [stdio](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#stdio) transport based on the `type` defined in your [project configuration](/build/project-config).
+
+### HTTP
+
+This is the native and recommended way to deploy your server on Smithery.
+We provide an [SDK in TypeScript](https://github.com/smithery-ai/sdk) to help you create a Smithery-compatible HTTP server.
+
+If you prefer to implement the server yourself without using our SDK, you should follow the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) specification and use MCP's official language-specific SDK.
+There are a few Smithery-specified details you should be aware of:
+
+1. The `/mcp` endpoint MUST be available and will be used to process `GET`, `POST` and `DELETE` requests as part of the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) specification.
+2. If your server requires configuration, we MUST pass the [configuration object](/use/session-config) to your server as a query parameter using dot-notation: `/mcp?server.host=localhost&server.port=8080&debug=true`.
+
+### STDIO
+
+**This is deprecated.**
+
+We highly recommend using HTTP servers over STDIO servers for better performance and future proofing for OAuth support. If you deploy a STDIO server, we will wrap your server and proxy it over HTTP for you.
+
+## Serverless Hosting
+
+We serve your hosted MCP servers on Smithery over streamable HTTP in a serverless environment. Connections to stateful servers will timeout after 2 minutes of inactivity.
+You will need to handle reconnection at the client if needed.
+You should design your server with ephemeral storage in mind.
+Persistent data should be stored in an external database.
+
+## Tool Lists
+
+Smithery can only display tool lists for servers that don't require authentication to list tools. Server developers must ensure that the list tools functionality is not dependent on any API keys or configurations that users have to provide.
+
+As a server developer, you can implement this by supporting "lazy loading" - only authenticating using your required configuration/API keys upon tool call, rather than upon initialization or tool listing.
+
+————————————————————————————————————————————
+
+# Project Configuration
+
+> Learn how to configure your project for deployment on Smithery.
+
+# Project Configuration
+
+This guide explains how to configure your project for deployment on Smithery. Your project configuration tells us how to deploy your server and should live in the base of your repository. They are not the same as [session configurations](/use/session-config) that clients pass to initialize a new session on your server.
+
+## Concepts
+
+### Configuration Files
+
+There are two required configuration files that tell Smithery how to build and run your server:
+
+1. **Dockerfile**: Defines how to build your server's container image
+2. **smithery.yaml**: Specifies how to start and run your server
+
+### Automatic Setup
+
+Smithery will attempt to automatically generate a pull-request with these files when you trigger a deployment. However, in some cases, the setup can fail and you may need to set this up manually.
+
+## Required Files
+
+### Dockerfile
+
+The Dockerfile tells us how to build your server. It should be placed in the root of your project or in the subdirectory containing your MCP server.
+
+``\`dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY . .
+RUN pip install -r requirements.txt
+
+CMD ["python", "server.py"]
+``\`
+
+### smithery.yaml
+
+The smithery.yaml file tells us how to start your server. It should be placed alongside your Dockerfile.
+
+`` \`yaml
+version: 1
+start:
+    command: ["python", "server.py"]
+    port: 8000
+ ``\`
+
+## Project Structure
+
+### Subdirectories
+
+If your package is not in the root directory of your repository (in the case of a monorepo), you should place your Dockerfile and `smithery.yaml` in the subdirectory that contains your package. You will need to specify the base directory in your server settings on Smithery.
+
+For example, if your MCP server is in the `packages/mcp-server` directory:
+
+1. Place your `Dockerfile` and `smithery.yaml` in the `packages/mcp-server` directory
+2. Set the base directory to `packages/mcp-server` in your server settings under Github integration
+
+## Best Practices
+
+1. **Testing**: Test your MCP server locally before deploying using [MCP Inspector](https://github.com/modelcontextprotocol/inspector). Please ensure your Dockerfile builds locally first before deploying.
+2. **Configuration**: Use the `configSchema` to properly define and validate your server's configuration options
+3. **Docker Optimization**: Keep your Docker image size minimal by using appropriate base images and multi-stage builds
+
+## Next Steps
+
+Once you have configured your project, you can [deploy your server](/build/deployments).
+
+————————————————————————————————————————————
+
+# Dockerfile Configuration
+
+> Learn how to configure your Dockerfile for Smithery MCP servers.
+
+# Dockerfile Configuration
+
+Create a `Dockerfile` in your repository root that defines how to build your MCP server. Your Dockerfile should be created such that running your Docker image will start your [STDIO server](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#stdio).
+
+## Example Dockerfile
+
+Here's an example Dockerfile that builds a Node-based MCP server:
+
+``\`dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+
+COPY package\*.json ./
+
+# Install dependencies
+
+RUN npm install
+
+# Copy application code
+
+COPY . .
+
+# Build the application
+
+RUN npm run build
+
+# Command will be provided by smithery.yaml
+
+CMD ["node", "dist/index.js"]
+``\`
+
+## Requirements
+
+**We only support Linux Docker images on major distros (Alpine/Debian-based) and expect `sh` to run in your container. Other distros are untested and may not deploy.**
+
+## Examples
+
+You can find examples of Dockerfiles in Smithery's [reference implementations](https://github.com/smithery-ai/reference-servers/tree/main/src).
+
+## Related Configuration
+
+### smithery.yaml
+
+Create a `smithery.yaml` file in your repository root. This file defines the server type, how the MCP server should be started and its configuration options.
+
+``\`yaml
+
+# Smithery.ai configuration
+
+startCommand:
+        type: stdio
+        configSchema:
+            # JSON Schema defining the configuration options for the MCP.
+            {}
+        commandFunction:
+            # A function that produces the CLI command to start the MCP on stdio.
+            |-
+            (config) => ({
+                "command": "node",
+                "args": [
+                    "dist/index.js"
+                ],
+                "env": {
+                    ...
+                }
+            })
+``\`
+
+————————————————————————————————————————————
+
+# smithery.yaml Reference
+
+> Reference documentation for the smithery.yaml configuration file.
+
+# smithery.yaml Reference
+
+The `smithery.yaml` file provides configuration for your Model Context Protocol (MCP) server on Smithery. This file must be placed in your repository root.
+
+## Configuration Options
+
+### startCommand
+
+**Type**: Object (Required)
+
+Defines how to start your MCP server. The structure varies based on the server type you're using.
+
+Smithery supports two types of MCP servers: HTTP and STDIO. Choose the appropriate configuration based on your server implementation.
+
+#### HTTP Server Configuration
+
+`` \`yaml
+startCommand:
+    type: http
+    configSchema: object
+ ``\`
+
+| Property                | Type      | Description                                                                                                                                                                                                                                                                          |
+| ----------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `type`                  | string    | Must be set to `"http"` for HTTP-based MCP servers                                                                                                                                                                                                                                   |
+| `configSchema`          | object    | JSON Schema defining the configuration options for your server. Smithery uses this to validate user configurations before starting your server.                                                                                                                                      |
+
+With HTTP servers, Smithery will start your application and route MCP traffic to the `/mcp` endpoint under the provided `PORT` environment variable. Your server needs to implement the [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) protocol and handle configuration objects passed via the query parameter.
+
+**Example HTTP Configuration:**
+
+`` \`yaml
+startCommand:
+    type: http
+    configSchema:
+        type: object
+        required: ["apiKey"]
+        properties:
+            apiKey:
+                type: string
+                title: "API Key"
+                description: "Your API key"
+            temperature:
+                type: number
+                default: 0.7
+                minimum: 0
+                maximum: 1
+ ``\`
+
+We recommend using our [TypeScript SDK](https://github.com/smithery-ai/sdk) to create HTTP-based MCP servers.
+
+#### STDIO Server Configuration
+
+`` \`yaml
+startCommand:
+    type: stdio
+    configSchema: object
+    commandFunction: string
+ ``\`
+
+| Property                      | Type      | Description                                                                                                                                                                                                                                                                          |
+| ----------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `type`                        | string    | Must be set to `"stdio"` for standard I/O based MCP servers                                                                                                                                                                                                                          |
+| `configSchema`                | object    | JSON Schema defining the configuration options for your server. Smithery uses this to validate user configurations before starting your server.                                                                                                                                      |
+| `commandFunction`             | string    | A JavaScript function that returns the command, arguments and environment variables required to start your server. See details below.                                                                                                                                                |
+
+#### commandFunction Details
+
+This JavaScript function receives a validated `config` object and must return an object with the following properties:
+
+`` \`js
+(config) => ({
+    command: string, // The command to execute
+    args: string[],    // Array of command arguments
+    env: object            // Environment variables as key-value pairs
+})
+ ``\`
+
+You can trust that the `config` parameter conforms to your defined `configSchema`.
+
+### build (Optional)
+
+**Type**: Object
+
+Contains build configuration options for your server.
+
+`` \`yaml
+build:
+    dockerfile: string
+    dockerBuildPath: string
+ ``\`
+
+| Property                    | Type      | Description                                                                                                            |
+| --------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `dockerfile`                | string    | Path to Dockerfile, relative to the smithery.yaml file                                                                 |
+| `dockerBuildPath`           | string    | Path to docker build context, relative to the smithery.yaml file                                                       |
+
+————————————————————————————————————————————
+```
