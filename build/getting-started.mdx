@@ -18,16 +18,18 @@ The Smithery CLI provides powerful tools for TypeScript developers to build, tes
 ### 1. Install CLI
 
 ```bash
-npm install -g @smithery/cli @modelcontextprotocol/sdk
+npm install -g @smithery/cli
 ```
 
 ### 2. Initialize Project
 
 ```bash
-mkdir my-mcp-server
-cd my-mcp-server
+mkdir mcp-server
+cd mcp-server
 npm init -y
 npm install @modelcontextprotocol/sdk zod
+mkdir src
+touch src/index.ts
 ```
 
 ### 3. Create Your Server
@@ -138,7 +140,7 @@ Update your `package.json` to specify the entry point:
 
 ```json
 {
-  "name": "my-mcp-server",
+  "name": "mcp-server",
   "module": "./src/index.ts",
   "type": "module"
 }
