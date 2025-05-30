@@ -47,11 +47,10 @@ Create `src/index.ts`:
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-// Optional: Define configuration schema
-export const configSchema = z.object({
-  apiKey: z.string().describe("Your API key"),
-  debug: z.boolean().default(false).describe("Enable debug logging")
-});
+// Optional: Define configuration schema to require configuration at connection time
+// export const configSchema = z.object({
+//   debug: z.boolean().default(false).describe("Enable debug logging")
+// });
 
 export function createStatelessServer({ config }: { config: z.infer<typeof configSchema> }) {
   const server = new McpServer({
@@ -81,11 +80,10 @@ export function createStatelessServer({ config }: { config: z.infer<typeof confi
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-// Optional: Define configuration schema
-export const configSchema = z.object({
-  apiKey: z.string().describe("Your API key"),
-  debug: z.boolean().default(false).describe("Enable debug logging")
-});
+// Optional: Define configuration schema to require configuration at connection time
+// export const configSchema = z.object({
+//   debug: z.boolean().default(false).describe("Enable debug logging")
+// });
 
 export function createStatefulServer({ 
   sessionId, 
@@ -175,7 +173,7 @@ Export a `configSchema` using Zod for type-safe configuration:
 
 ```typescript
 export const configSchema = z.object({
-  apiKey: z.string().describe("Required API key"),
+  myApiKey: z.string().describe("Required API key"),
   options: z.object({
     timeout: z.number().default(5000),
     retries: z.number().default(3)
