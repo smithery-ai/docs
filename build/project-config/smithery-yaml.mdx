@@ -9,8 +9,44 @@ The `smithery.yaml` file provides configuration for your Model Context Protocol 
 
 ## Configuration Options
 
+### runtime (Optional)
+**Type**: String  
+**Default**: Auto-assigned by Smithery
+
+Specifies the deployment runtime for your MCP server:
+
+- `"typescript"` - Uses the Smithery CLI to build your TypeScript project directly
+- `"container"` - Uses Docker containers for deployment (supports any language)
+
+If not specified, Smithery will automatically assign the appropriate runtime based on your project structure.
+
+---
+
+## TypeScript Runtime Configuration
+
+When using `runtime: "typescript"`, Smithery uses the [Smithery CLI](https://github.com/smithery-ai/cli) to build your TypeScript MCP server directly. This is the recommended approach for TypeScript projects.
+
+```yaml
+runtime: typescript
+env:
+  NODE_ENV: production
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `runtime` | string | Must be set to `"typescript"` |
+| `env` | object | Optional environment variables to inject when running your server |
+
+With TypeScript runtime, your server will be built using `@smithery/cli build` and deployed as a streamable HTTP server. We recommend using our [TypeScript SDK](https://github.com/smithery-ai/sdk) for the best experience.
+
+---
+
+## Container Runtime Configuration
+
+When using `runtime: "container"` (or when runtime is not specified), Smithery uses Docker containers to build and deploy your server. This supports any programming language.
+
 ### startCommand
-**Type**: Object (Required)
+**Type**: Object (Required for container runtime)
 
 Defines how to start your MCP server. The structure varies based on the server type you're using.
 
@@ -19,6 +55,7 @@ Smithery supports two types of MCP servers: HTTP and STDIO. Choose the appropria
 #### HTTP Server Configuration
 
 ```yaml
+runtime: container  # Optional - this is the default
 startCommand:
   type: http
   configSchema: object
@@ -51,11 +88,10 @@ startCommand:
         maximum: 1
 ```
 
-We recommend using our [TypeScript SDK](https://github.com/smithery-ai/sdk) to create HTTP-based MCP servers.
-
 #### STDIO Server Configuration
 
 ```yaml
+runtime: container  # Optional - this is the default
 startCommand:
   type: stdio
   configSchema: object
@@ -83,11 +119,12 @@ This JavaScript function receives a validated `config` object and must return an
 You can trust that the `config` parameter conforms to your defined `configSchema`.
 
 ### build (Optional)
-**Type**: Object
+**Type**: Object (Only for container runtime)
 
-Contains build configuration options for your server.
+Contains build configuration options for your server when using container runtime.
 
 ```yaml
+runtime: container  # Optional - this is the default
 build:
   dockerfile: string
   dockerBuildPath: string
@@ -95,5 +132,16 @@ build:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `dockerfile` | string | Path to Dockerfile, relative to the smithery.yaml file |
-| `dockerBuildPath` | string | Path to docker build context, relative to the smithery.yaml file |
+| `dockerfile` | string | Path to Dockerfile, relative to the smithery.yaml file. Defaults to "Dockerfile" |
+| `dockerBuildPath` | string | Path to docker build context, relative to the smithery.yaml file. Defaults to "." |
+
+### env (Optional)
+**Type**: Object
+
+Environment variables to inject when running your server (available for both runtime types).
+
+```yaml
+env:
+  NODE_ENV: production
+  DEBUG: "true"
+```

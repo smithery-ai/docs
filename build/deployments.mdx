@@ -3,8 +3,6 @@ title: 'Deployments'
 description: 'Learn how to deploy your MCP server on Smithery.'
 ---
 
-# Deployments
-
 Smithery Deployments allow you to host your MCP server on Smithery served over [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection.
 
 ## Overview
@@ -33,13 +31,7 @@ There are a few Smithery-specified details you should be aware of:
 **This is deprecated.**
 
 We highly recommend using HTTP servers over STDIO servers for better performance and future proofing for OAuth support. If you deploy a STDIO server, we will wrap your server and proxy it over HTTP for you.
-
-## Serverless Hosting
-
-We serve your hosted MCP servers on Smithery over streamable HTTP in a serverless environment. Connections to stateful servers will timeout after 2 minutes of inactivity.
-You will need to handle reconnection at the client if needed.
-You should design your server with ephemeral storage in mind.
-Persistent data should be stored in an external database.
+Connections to stdio servers will timeout after 2 minutes of inactivity and are less reliable.
 
 ## Tool Lists
 Smithery can only display tool lists for servers that don't require authentication to list tools. Server developers must ensure that the list tools functionality is not dependent on any API keys or configurations that users have to provide.

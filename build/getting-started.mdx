@@ -132,16 +132,38 @@ export function createStatefulServer({
 
 </CodeGroup>
 
-### 4. Start Development
+### 4. Configure Entry Point
+
+Update your `package.json` to specify the entry point:
+
+```json
+{
+  "name": "my-mcp-server",
+  "module": "./src/index.ts",
+  "type": "module"
+}
+```
+
+### 5. Start Development
 
 ```bash
 npx @smithery/cli dev
 ```
 
 This will:
+- Read your entry point from the `module` field in `package.json`
 - Start your server with hot-reload
-- Create a public tunnel for testing
-- Open the Smithery playground
+- Open the Smithery playground for you to test
+
+### 6. Deploy
+
+Add a [smithery.yaml](/build/project-config/smithery-yaml#typescript-runtime-configuration) file to your project root:
+
+```smithery.yaml
+runtime: typescript
+```
+
+Then [deploy](/build/deployments) from Smithery's UI.
 
 ## Key Concepts
 
@@ -166,12 +188,12 @@ Benefits:
 
 ### Server Types
 
-**Stateless** (recommended): Each request is independent
+**Stateless**: Each request is independent and we will create a new instance of your server for each request.
 ```typescript
 export function createStatelessServer({ config }) { ... }
 ```
 
-**Stateful**: Session-aware with persistent data
+**Stateful**: Session-aware. We will create a new instance of your server for each session. You can identify sessions via the `sessionId` parameter.
 ```typescript
 export function createStatefulServer({ sessionId, config }) { ... }
 ```
@@ -183,7 +205,7 @@ export function createStatefulServer({ sessionId, config }) { ... }
 The Smithery CLI supports building servers for different transport protocols:
 
 #### SHTTP Transport (Default)
-SHTTP (Streamable HTTP) is ideal for web-based applications and services that need HTTP connectivity:
+SHTTP (Streamable HTTP) is for MCPs that are meant to be deployed online:
 
 ```bash
 npx @smithery/cli build
@@ -192,7 +214,7 @@ npx @smithery/cli build --transport shttp
 ```
 
 #### STDIO Transport
-STDIO transport is perfect for command-line tools and desktop applications that communicate via standard input/output:
+STDIO transport is for MCPs that are meant to be used within a local environment:
 
 ```bash
 npx @smithery/cli build --transport stdio
@@ -203,15 +225,6 @@ npx @smithery/cli build --transport stdio
 ```bash
 # Build with custom entry file
 npx @smithery/cli build src/my-server.ts
-```
-
-By default, the CLI reads your entry point from the `"module"` field in `package.json`:
-
-```json
-{
-  "name": "my-mcp-server",
-  "module": "./src/index.ts"
-}
 ```
 
 Creates `.smithery/index.cjs` - a bundled, production-ready server.
