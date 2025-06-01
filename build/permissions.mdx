@@ -23,3 +23,34 @@ Smithery requires the following permissions to your connected Github account:
 | **Repository Hooks** | ✓ | ✓ | Allows creation and management of webhooks that notify Smithery when code changes, enabling automated updates to your MCP servers. |
 
 These permissions allow Smithery to create a seamless integration with Github, responding automatically to your code changes and keeping your MCP servers up-to-date.
+
+## Installing the GitHub App
+
+### Automatic Installation
+
+When you create a new MCP server on Smithery, you'll be automatically prompted to install the GitHub app for your repositories. This ensures seamless integration from the start.
+
+### Manual Installation
+
+If you need to install the GitHub app manually or want to grant access to additional repositories, you can do so at any time:
+
+1. **Visit the GitHub App page**: [https://github.com/apps/smithery-ai](https://github.com/apps/smithery-ai)
+
+2. **Click "Install"** to add the app to your GitHub account or organization
+
+3. **Choose repositories**: Select whether to install on:
+   - All repositories (current and future)
+   - Selected repositories only
+
+4. **Complete installation**: Review the permissions and click "Install" to finish
+
+### Managing Repository Access
+
+After installation, you can modify which repositories Smithery has access to:
+
+- Go to your GitHub account settings
+- Navigate to **Applications** → **Installed GitHub Apps**
+- Find **Smithery** and click **Configure**
+- Add or remove repository access as needed
+
+The GitHub app installation is required for Smithery to automatically deploy your MCP servers, create pull request status checks, and provide real-time deployment feedback.
