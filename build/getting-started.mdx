@@ -1,11 +1,11 @@
 ---
 title: 'Getting Started'
-description: 'Learn how to develop and build Model Context Protocol (MCP) servers using TypeScript with Smithery CLI.'
+description: 'Learn how to develop Model Context Protocol (MCP) servers using TypeScript with Smithery CLI.'
 ---
 
 # Getting Started with TypeScript MCPs
 
-The Smithery CLI provides powerful tools for TypeScript developers to build, test, and deploy Model Context Protocol (MCP) servers.
+The Smithery CLI provides tools for TypeScript developers to build, test, and deploy Model Context Protocol (MCP) servers.
 
 ## Prerequisites
 
@@ -36,14 +36,7 @@ touch src/index.ts
 
 Create `src/index.ts`:
 
-**Choose your server type:**
-
-- **Stateless**: Best for most use cases. Each request is independent with no shared state between calls. (e.g., search APIs)
-- **Stateful**: Use when you need to maintain data across requests within a session (e.g., database connections, code interpreters).
-
-<CodeGroup>
-
-```typescript Stateless Server
+```typescript
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
@@ -52,7 +45,7 @@ import { z } from 'zod';
 //   debug: z.boolean().default(false).describe("Enable debug logging")
 // });
 
-export function createStatelessServer({ config }: { config: z.infer<typeof configSchema> }) {
+export default function ({ config }: { config: z.infer<typeof configSchema> }) {
   const server = new McpServer({
     name: 'My MCP Server',
     version: '1.0.0'
@@ -76,61 +69,30 @@ export function createStatelessServer({ config }: { config: z.infer<typeof confi
 }
 ```
 
-```typescript Stateful Server
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
+<Expandable title="Configuration Schema">
+### Configuration Schema
 
-// Optional: Define configuration schema to require configuration at connection time
-// export const configSchema = z.object({
-//   debug: z.boolean().default(false).describe("Enable debug logging")
-// });
+MCP servers can accept [session configurations](/use/session-config) to customize their behavior for each client session. This allows users to provide API keys, adjust settings, or modify how your server operates when they connect.
 
-export function createStatefulServer({ 
-  sessionId, 
-  config 
-}: { 
-  sessionId: string; 
-  config: z.infer<typeof configSchema> 
-}) {
-  const server = new McpServer({
-    name: 'My Stateful MCP Server',
-    version: '1.0.0'
-  });
+Export a `configSchema` using Zod to define what configuration your server accepts:
 
-  // Session-specific state
-  const sessionData = new Map();
-
-  server.tool(
-    'get_session',
-    'Get current session ID',
-    {},
-    async () => {
-      return {
-        content: [{ type: 'text', text: `Session: ${sessionId}` }]
-      };
-    }
-  );
-
-  server.tool(
-    'store_data',
-    'Store data in session',
-    {
-      key: z.string().describe('Storage key'),
-      value: z.string().describe('Value to store')
-    },
-    async ({ key, value }) => {
-      sessionData.set(key, value);
-      return {
-        content: [{ type: 'text', text: `Stored ${key}: ${value}` }]
-      };
-    }
-  );
-
-  return server.server;
-}
+```typescript
+export const configSchema = z.object({
+  myApiKey: z.string().describe("Required API key"),
+  options: z.object({
+    timeout: z.number().default(5000),
+    retries: z.number().default(3)
+  }).optional()
+});
 ```
 
-</CodeGroup>
+Benefits:
+- **Type safety**: Use `z.infer<typeof configSchema>` for TypeScript types
+- **Runtime validation**: Automatically validate configuration at connection time
+- **Auto-generated UI**: Smithery creates configuration forms based on your schema
+- **Documentation**: Schema descriptions become help text for users
+
+</Expandable>
 
 ### 4. Configure Entry Point
 
@@ -164,80 +126,3 @@ runtime: typescript
 ```
 
 Then [deploy](/build/deployments) from Smithery's UI.
-
-## Key Concepts
-
-### Configuration Schema
-
-Export a `configSchema` using Zod for type-safe configuration:
-
-```typescript
-export const configSchema = z.object({
-  myApiKey: z.string().describe("Required API key"),
-  options: z.object({
-    timeout: z.number().default(5000),
-    retries: z.number().default(3)
-  }).optional()
-});
-```
-
-Benefits:
-- Type safety with `z.infer<typeof configSchema>`
-- Runtime validation
-- Auto-generated UI forms
-
-### Server Types
-
-**Stateless**: Each request is independent and we will create a new instance of your server for each request.
-```typescript
-export function createStatelessServer({ config }) { ... }
-```
-
-**Stateful**: Session-aware. We will create a new instance of your server for each session. You can identify sessions via the `sessionId` parameter.
-```typescript
-export function createStatefulServer({ sessionId, config }) { ... }
-```
-
-## Building
-
-### Build for Production
-
-The Smithery CLI supports building servers for different transport protocols:
-
-#### SHTTP Transport (Default)
-SHTTP (Streamable HTTP) is for MCPs that are meant to be deployed online:
-
-```bash
-npx @smithery/cli build
-# or explicitly specify shttp
-npx @smithery/cli build --transport shttp
-```
-
-#### STDIO Transport
-STDIO transport is for MCPs that are meant to be used within a local environment:
-
-```bash
-npx @smithery/cli build --transport stdio
-```
-
-#### Custom Entry Point & Output
-
-```bash
-# Build with custom entry file
-npx @smithery/cli build src/my-server.ts
-```
-
-Creates `.smithery/index.cjs` - a bundled, production-ready server.
-
-### Test Built Server
-
-#### SHTTP Server
-```bash
-node .smithery/index.cjs
-# Server starts on http://localhost:8181
-```
-
-#### STDIO Server
-```bash
-# Test with configuration
-node .smithery/index.cjs apiKey=your-key debug=true
