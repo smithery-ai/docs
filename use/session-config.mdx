@@ -22,7 +22,7 @@ MCP server developers define their configuration requirements using JSON Schema 
 
 ```yaml smithery.yaml
 startCommand:
-    type: stdio
+    type: http
     configSchema:
       type: object
       required: ["openaiApiKey"]
@@ -83,12 +83,6 @@ If your server doesn't need any configuration, you can use an empty schema:
   startCommand:
     type: http
     configSchema: {}
-    commandFunction: |-
-      (config) => ({
-        "command": "node",
-          "args": ["dist/index.js"],
-          "env": {}
-        })
 ```
 
 ### Database Connection Configuration
@@ -97,7 +91,7 @@ A database connector might require connection details:
 
 ```yaml smithery.yaml
   startCommand:
-    type: stdio
+    type: http
     configSchema:
       type: object
       required: ["connectionString"]
@@ -114,16 +108,6 @@ A database connector might require connection details:
         debug:
           type: boolean
           default: false
-    commandFunction: |-
-      (config) => ({
-        "command": "python",
-        "args": ["-m", "db_connector.main"],
-        "env": {
-          "DB_CONNECTION": config.connectionString,
-          "MAX_CONNECTIONS": config.maxConnections.toString(),
-          "DEBUG": config.debug ? "1" : "0"
-        }
-      })
 ```
 
 ## Best Practices for MCP Authors

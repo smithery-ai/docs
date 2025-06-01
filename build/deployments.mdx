@@ -3,37 +3,99 @@ title: 'Deployments'
 description: 'Learn how to deploy your MCP server on Smithery.'
 ---
 
-Smithery Deployments allow you to host your MCP server on Smithery served over [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection.
+Smithery Deployments allow you to host your MCP server on Smithery served over [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection.
 
-## Overview
+## Which deployment method should I use?
 
-Deploying on Smithery is straightforward:
+- **[TypeScript Deploy](#typescript-deploy)**: Choose this if you're building with TypeScript using the Smithery CLI
+- **[Custom Deploy](#custom-deploy)**: Choose this if you're using another language or need full control over your Docker container
 
-1. [Add your server](/new) to Smithery (or claim it if it's already listed)
-2. Click Deploy on Smithery Deployments tab on your server page (_only authenticated server owners can see this tab_)
+## TypeScript Deploy
 
-That's it! Your MCP server will be built and deployed according to your [project configuration](/build/project-config).
+The fastest way to deploy TypeScript MCP servers on Smithery. This method automatically builds and deploys your server using our TypeScript runtime.
 
-## Supported Transports
-We are able to host MCP servers that use the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) and the [stdio](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#stdio) transport based on the `type` defined in your [project configuration](/build/project-config).
+### Prerequisites
 
-### HTTP
-This is the native and recommended way to deploy your server on Smithery.
-We provide an [SDK in TypeScript](https://github.com/smithery-ai/sdk) to help you create a Smithery-compatible HTTP server.
+- TypeScript MCP server
+- Built with the [Smithery CLI](https://github.com/smithery-ai/cli)
+- Repository with `package.json` and proper entry points
 
-If you prefer to implement the server yourself without using our SDK, you should follow the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) specification and use MCP's official language-specific SDK.
-There are a few Smithery-specified details you should be aware of:
+### Setup
 
-1. The `/mcp` endpoint MUST be available and will be used to process `GET`, `POST` and `DELETE` requests as part of the [streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) specification.
-2. If your server requires configuration, we MUST pass the [configuration object](/use/session-config) to your server as a query parameter using dot-notation: `/mcp?server.host=localhost&server.port=8080&debug=true`.
+Create a `smithery.yaml` file in your repository root:
 
-### STDIO
-**This is deprecated.**
+```yaml
+runtime: "typescript"
+```
 
-We highly recommend using HTTP servers over STDIO servers for better performance and future proofing for OAuth support. If you deploy a STDIO server, we will wrap your server and proxy it over HTTP for you.
-Connections to stdio servers will timeout after 2 minutes of inactivity and are less reliable.
+See the [Getting Started guide](/build/getting-started) for complete TypeScript server development instructions.
 
-## Tool Lists
-Smithery can only display tool lists for servers that don't require authentication to list tools. Server developers must ensure that the list tools functionality is not dependent on any API keys or configurations that users have to provide.
+### Deploy
 
-As a server developer, you can implement this by supporting "lazy loading" - only authenticating using your required configuration/API keys upon tool call, rather than upon initialization or tool listing.
+1. Push your code (including `smithery.yaml`) to GitHub
+2. [Connect your GitHub](/new) to Smithery (or claim your server if already listed)
+3. Navigate to the Deployments tab on your server page
+4. Click Deploy to build and host your server
+
+## Custom Deploy
+
+For advanced users deploying Docker containers in any programming language.
+
+### Prerequisites
+
+- Docker container that implements [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http)
+- Dockerfile in your repository
+- Server that listens on `PORT` environment variable
+
+### Technical Requirements
+
+#### HTTP Endpoint
+- **Endpoint**: `/mcp` must be available
+- **Methods**: Handle `GET`, `POST`, and `DELETE` requests
+- **Port**: Listen on `PORT` environmental variable
+
+#### Configuration Handling
+Smithery passes [configuration](/use/session-config) as query parameters using dot-notation:
+
+```
+GET/POST /mcp?server.host=localhost&server.port=8080&apiKey=secret123
+```
+
+Parse these into a configuration object supporting nested properties.
+
+### Setup
+
+Create a `smithery.yaml` file:
+
+```yaml
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"           # Path to your Dockerfile
+  dockerBuildPath: "."               # Docker build context
+startCommand:
+  type: "http"
+  configSchema:                      # JSON Schema for configuration
+    type: "object"
+    properties:
+      apiKey:
+        type: "string"
+        description: "Your API key"
+    required: ["apiKey"]
+  exampleConfig:
+    apiKey: "sk-example123"
+```
+
+### Deploy
+
+1. Push your code (including `smithery.yaml` and `Dockerfile`) to GitHub
+2. [Connect your GitHub](/new) to Smithery (or claim your server if already listed)
+3. Navigate to the Deployments tab on your server page
+4. Click Deploy to build and host your container
+
+## Best Practices
+
+### Tool Discovery
+To ensure your tools appear in Smithery's registry, implement "lazy loading":
+- List tools without requiring authentication
+- Only validate API keys when tools are actually invoked
+- This allows users to discover your server's capabilities before configuring it

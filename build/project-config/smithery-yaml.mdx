@@ -9,139 +9,134 @@ The `smithery.yaml` file provides configuration for your Model Context Protocol 
 
 ## Configuration Options
 
-### runtime (Optional)
+### runtime
 **Type**: String  
-**Default**: Auto-assigned by Smithery
+**Required**: Yes
 
 Specifies the deployment runtime for your MCP server:
 
 - `"typescript"` - Uses the Smithery CLI to build your TypeScript project directly
 - `"container"` - Uses Docker containers for deployment (supports any language)
 
-If not specified, Smithery will automatically assign the appropriate runtime based on your project structure.
+```yaml
+runtime: "typescript"  # or "container"
+```
 
 ---
 
-## TypeScript Runtime Configuration
+## TypeScript Runtime
 
 When using `runtime: "typescript"`, Smithery uses the [Smithery CLI](https://github.com/smithery-ai/cli) to build your TypeScript MCP server directly. This is the recommended approach for TypeScript projects.
 
 ```yaml
-runtime: typescript
+runtime: "typescript"
 env:
-  NODE_ENV: production
+  NODE_ENV: "production"
 ```
+
+### Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `runtime` | string | Must be set to `"typescript"` |
 | `env` | object | Optional environment variables to inject when running your server |
 
-With TypeScript runtime, your server will be built using `@smithery/cli build` and deployed as a streamable HTTP server. We recommend using our [TypeScript SDK](https://github.com/smithery-ai/sdk) for the best experience.
+Your server will be built using `@smithery/cli build` and deployed as a streamable HTTP server. We recommend using the [Smithery CLI](https://github.com/smithery-ai/cli) for the best development experience.
 
 ---
 
-## Container Runtime Configuration
+## Container Runtime
 
-When using `runtime: "container"` (or when runtime is not specified), Smithery uses Docker containers to build and deploy your server. This supports any programming language.
+When using `runtime: "container"`, Smithery uses Docker containers to build and deploy your server. This supports any programming language and gives you full control over the deployment environment.
+
+```yaml
+runtime: "container"
+startCommand:
+  type: "http"
+  configSchema:
+    type: "object"
+    properties:
+      apiKey:
+        type: "string"
+        description: "Your API key"
+    required: ["apiKey"]
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+```
 
 ### startCommand
 **Type**: Object (Required for container runtime)
 
-Defines how to start your MCP server. The structure varies based on the server type you're using.
-
-Smithery supports two types of MCP servers: HTTP and STDIO. Choose the appropriate configuration based on your server implementation.  
-
-#### HTTP Server Configuration
-
-```yaml
-runtime: container  # Optional - this is the default
-startCommand:
-  type: http
-  configSchema: object
-```
+Defines how your MCP server should be configured and accessed.
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `type` | string | Must be set to `"http"` for HTTP-based MCP servers |
-| `configSchema` | object | JSON Schema defining the configuration options for your server. Smithery uses this to validate user configurations before starting your server. |
+| `configSchema` | object | JSON Schema defining the configuration options for your server |
+| `exampleConfig` | object | Example configuration values for testing |
 
-With HTTP servers, Smithery will start your application and route MCP traffic to the `/mcp` endpoint under the provided `PORT` environment variable. Your server needs to implement the [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) protocol and handle configuration objects passed via the query parameter.
+Your server must implement the [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) protocol and handle configuration passed via query parameters to the `/mcp` endpoint.
 
-**Example HTTP Configuration:**
+**Example with complex configuration:**
 
 ```yaml
 startCommand:
-  type: http
+  type: "http"
   configSchema:
-    type: object
+    type: "object"
     required: ["apiKey"]
     properties:
       apiKey:
-        type: string
+        type: "string"
         title: "API Key"
         description: "Your API key"
       temperature:
-        type: number
+        type: "number"
         default: 0.7
         minimum: 0
         maximum: 1
+      database:
+        type: "object"
+        properties:
+          host:
+            type: "string"
+            default: "localhost"
+          port:
+            type: "integer"
+            default: 5432
+  exampleConfig:
+    apiKey: "sk-example123"
+    temperature: 0.8
+    database:
+      host: "localhost"
+      port: 5432
 ```
 
-#### STDIO Server Configuration
+### build
+**Type**: Object (Optional for container runtime)
 
-```yaml
-runtime: container  # Optional - this is the default
-startCommand:
-  type: stdio
-  configSchema: object
-  commandFunction: string
-```
+Contains Docker build configuration for your server.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `type` | string | Must be set to `"stdio"` for standard I/O based MCP servers |
-| `configSchema` | object | JSON Schema defining the configuration options for your server. Smithery uses this to validate user configurations before starting your server. |
-| `commandFunction` | string | A JavaScript function that returns the command, arguments and environment variables required to start your server. See details below. |
-
-#### commandFunction Details
-
-This JavaScript function receives a validated `config` object and must return an object with the following properties:
-
-```js
-(config) => ({
-  command: string, // The command to execute
-  args: string[],  // Array of command arguments
-  env: object      // Environment variables as key-value pairs
-})
-```
-
-You can trust that the `config` parameter conforms to your defined `configSchema`.
-
-### build (Optional)
-**Type**: Object (Only for container runtime)
-
-Contains build configuration options for your server when using container runtime.
+| `dockerfile` | string | Path to Dockerfile, relative to smithery.yaml. Defaults to "Dockerfile" |
+| `dockerBuildPath` | string | Docker build context path, relative to smithery.yaml. Defaults to "." |
 
 ```yaml
-runtime: container  # Optional - this is the default
 build:
-  dockerfile: string
-  dockerBuildPath: string
+  dockerfile: "docker/Dockerfile"
+  dockerBuildPath: "."
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `dockerfile` | string | Path to Dockerfile, relative to the smithery.yaml file. Defaults to "Dockerfile" |
-| `dockerBuildPath` | string | Path to docker build context, relative to the smithery.yaml file. Defaults to "." |
+### env
+**Type**: Object (Optional)
 
-### env (Optional)
-**Type**: Object
-
-Environment variables to inject when running your server (available for both runtime types).
+Environment variables to inject when running your server. Available for both runtime types.
 
 ```yaml
 env:
-  NODE_ENV: production
+  NODE_ENV: "production"
   DEBUG: "true"
+  LOG_LEVEL: "info"
 ```
