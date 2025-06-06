@@ -1,6 +1,6 @@
 ---
-title: 'Registry API'
-description: 'The Smithery Registry API provides a programmatic way to search for MCP servers.'
+title: "Registry API"
+description: "The Smithery Registry API provides a programmatic way to search for MCP servers."
 ---
 
 # Registry API
@@ -8,9 +8,11 @@ description: 'The Smithery Registry API provides a programmatic way to search fo
 The Smithery Registry API provides a programmatic way to search for MCP servers. This documentation will walk you through using the Registry API to obtain a remote MCP server.
 
 ## Concepts
+
 Our registry contains an index of MCP servers. Every server may have different ways of launching or connecting to them. Server authors specify a [configuration schema](/build/project-config), which is a JSON schema that defines the structure of the configuration that is required to connect to the server.
 
 ## Authentication
+
 All endpoints require authentication via a bearer token. You can create an API key [here](https://smithery.ai/account/api-keys).
 
 Include the following header in your API requests:
@@ -53,55 +55,55 @@ owner:mem0ai is:verified memory
 
 <Tabs>
   <Tab title="JavaScript">
-```javascript
-// JavaScript example using fetch
-const apiKey = 'your-smithery-api-token';
-const query = 'owner:mem0ai is:verified memory';
-const encodedQuery = encodeURIComponent(query);
-
-const response = await fetch(
-  `https://registry.smithery.ai/servers?q=${encodedQuery}&page=1&pageSize=10`,
-  {
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Accept': 'application/json'
-    }
-  }
-);
-
-const data = await response.json();
-console.log(data);
-```
+    ```javascript
+    // JavaScript example using fetch
+    const apiKey = 'your-smithery-api-token';
+    const query = 'owner:mem0ai is:verified memory';
+    const encodedQuery = encodeURIComponent(query);
+    
+    const response = await fetch(
+      `https://registry.smithery.ai/servers?q=${encodedQuery}&page=1&pageSize=10`,
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+    
+    const data = await response.json();
+    console.log(data);
+    ```
   </Tab>
   <Tab title="Python">
-```python
-# Python example using requests
-import requests
-from urllib.parse import quote
-
-api_key = 'your-smithery-api-token'
-query = 'owner:mem0ai is:verified memory'
-encoded_query = quote(query)
-
-response = requests.get(
-    f'https://registry.smithery.ai/servers?q={encoded_query}&page=1&pageSize=10',
-    headers={
-        'Authorization': f'Bearer {api_key}',
-        'Accept': 'application/json'
-    }
-)
-
-data = response.json()
-print(data)
-```
+    ```python
+    # Python example using requests
+    import requests
+    from urllib.parse import quote
+    
+    api_key = 'your-smithery-api-token'
+    query = 'owner:mem0ai is:verified memory'
+    encoded_query = quote(query)
+    
+    response = requests.get(
+        f'https://registry.smithery.ai/servers?q={encoded_query}&page=1&pageSize=10',
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Accept': 'application/json'
+        }
+    )
+    
+    data = response.json()
+    print(data)
+    ```
   </Tab>
   <Tab title="Bash">
-```bash
-# Using cURL
-curl -X GET "https://registry.smithery.ai/servers?q=owner:mem0ai%20is:verified%20memory&page=1&pageSize=10" \
-  -H "Authorization: Bearer your-smithery-api-token" \
-  -H "Accept: application/json"
-```
+    ```bash
+    # Using cURL
+    curl -X GET "https://registry.smithery.ai/servers?q=owner:mem0ai%20is:verified%20memory&page=1&pageSize=10" \
+      -H "Authorization: Bearer your-smithery-api-token" \
+      -H "Accept: application/json"
+    ```
   </Tab>
 </Tabs>
 
@@ -115,10 +117,13 @@ curl -X GET "https://registry.smithery.ai/servers?q=owner:mem0ai%20is:verified%2
       description: string;
       // Link to Smithery server page
       homepage: string;
+      iconUrl: string;
       // Number of times the server has been used via tool calling
-      useCount: string;
+      useCount: number;
       // True if this server is deployed on Smithery as a HTTP server
-      isDeployed: boolean
+      isDeployed: boolean;
+      // True if server is designed to run remotely
+      remote: boolean;
       createdAt: string;
     }>;
     pagination: {
@@ -144,52 +149,52 @@ Retrieves information about a specific server by its qualified name. The qualifi
 
 <Tabs>
   <Tab title="JavaScript">
-```javascript
-// JavaScript example using fetch
-const apiKey = 'your-smithery-api-token';
-const qualifiedName = 'exa';
-
-const response = await fetch(
-  `https://registry.smithery.ai/servers/${qualifiedName}`,
-  {
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Accept': 'application/json'
-    }
-  }
-);
-
-const data = await response.json();
-console.log(data);
-```
+    ```javascript
+    // JavaScript example using fetch
+    const apiKey = 'your-smithery-api-token';
+    const qualifiedName = 'exa';
+    
+    const response = await fetch(
+      `https://registry.smithery.ai/servers/${qualifiedName}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+    
+    const data = await response.json();
+    console.log(data);
+    ```
   </Tab>
   <Tab title="Python">
-```python
-# Python example using requests
-import requests
-
-api_key = 'your-smithery-api-token'
-qualified_name = 'exa'
-
-response = requests.get(
-    f'https://registry.smithery.ai/servers/{qualified_name}',
-    headers={
-        'Authorization': f'Bearer {api_key}',
-        'Accept': 'application/json'
-    }
-)
-
-data = response.json()
-print(data)
-```
+    ```python
+    # Python example using requests
+    import requests
+    
+    api_key = 'your-smithery-api-token'
+    qualified_name = 'exa'
+    
+    response = requests.get(
+        f'https://registry.smithery.ai/servers/{qualified_name}',
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Accept': 'application/json'
+        }
+    )
+    
+    data = response.json()
+    print(data)
+    ```
   </Tab>
   <Tab title="Bash">
-```bash
-# Using cURL
-curl -X GET "https://registry.smithery.ai/servers/exa" \
-  -H "Authorization: Bearer your-smithery-api-token" \
-  -H "Accept: application/json"
-```
+    ```bash
+    # Using cURL
+    curl -X GET "https://registry.smithery.ai/servers/exa" \
+      -H "Authorization: Bearer your-smithery-api-token" \
+      -H "Accept: application/json"
+    ```
   </Tab>
 </Tabs>
 
@@ -199,8 +204,10 @@ curl -X GET "https://registry.smithery.ai/servers/exa" \
 {
     qualifiedName: string;
     displayName: string;
+	description: string;
     iconUrl: string | null;
-    deploymentUrl: string;
+    remote: boolean;
+    deploymentUrl: string | null;
     connections: Array<{
       type: string;
       url?: string;
@@ -226,57 +233,63 @@ The response contains a comprehensive record of the server, including connection
 ### Properties
 
 #### name
+
 **Type**: `string`
 
 Qualified name of the MCP server in the format `owner/repository`.
 
 #### displayName
+
 **Type**: `string`
 
 Human-readable name of the MCP server.
 
 #### iconUrl
+
 **Type**: `string | null`
 
 URL to the server's icon image, or `null` if no icon is available.
 
 #### connections
+
 **Type**: `Array`
 
 Specifies how to connect to this server. Each object in the array represents a different connection method.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `type` | `string` | Connection type. Either `"http"` or `"stdio"`. |
-| `url` | `string` | HTTP URL to connect to (for `http` type). |
+| Property       | Type     | Description                                          |
+| -------------- | -------- | ---------------------------------------------------- |
+| `type`         | `string` | Connection type. Either `"http"` or `"stdio"`.       |
+| `url`          | `string` | HTTP URL to connect to (for `http` type).            |
 | `configSchema` | `object` | JSON Schema defining required configuration options. |
 
 #### security
+
 **Type**: `object`
 
 Information about the server's security status.
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property     | Type                | Description                                                                          |
+| ------------ | ------------------- | ------------------------------------------------------------------------------------ |
 | `scanPassed` | `boolean` \| `null` | Whether the server has passed security checks. `null` if no scan has been performed. |
 
 <Info>
-We use [Invariant](https://invariantlabs.ai/blog/introducing-mcp-scan) to scan for tool poisoning, rug pulls, cross-origin escalations, and prompt injection attacks.
+  We use [Invariant](https://invariantlabs.ai/blog/introducing-mcp-scan) to scan for tool poisoning, rug pulls, cross-origin escalations, and prompt injection attacks.
 </Info>
 
 #### tools
+
 **Type**: `Array | null`
 
 List of tools that this server provides, or `null` if no tools have been retrieved.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `name` | `string` | Name of the tool. |
-| `description` | `string` | Description of the tool. |
+| Property      | Type     | Description                                                |
+| ------------- | -------- | ---------------------------------------------------------- |
+| `name`        | `string` | Name of the tool.                                          |
+| `description` | `string` | Description of the tool.                                   |
 | `inputSchema` | `object` | JSON Schema defining the required parameters for the tool. |
 
 <Note>
-Tool information is cached from the server's last deployment. The actual tools returned by the MCP server at runtime may differ based on configuration or server updates.
+  Tool information is cached from the server's last deployment. The actual tools returned by the MCP server at runtime may differ based on configuration or server updates.
 </Note>
 
 ## Next Step
