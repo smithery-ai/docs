@@ -1,0 +1,37 @@
+runtime: python
+
+# Declare configuration schema (optional but recommended)
+configSchema:
+  type: object
+  properties:
+    weather_api_url:
+      type: string
+      description: "Custom weather API endpoint (optional)"
+      default: "https://wttr.in"
+    enable_alerts:
+      type: boolean
+      description: "Enable weather alerts feature"
+      default: true
+    cache_duration:
+      type: integer
+      description: "Cache duration in seconds"
+      default: 300
+      minimum: 60
+      maximum: 3600
+
+# Docker configuration for deployment
+build:
+  dockerfile: |
+    FROM python:3.11-slim
+    
+    WORKDIR /app
+    
+    # Install dependencies
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+    
+    # Copy application
+    COPY src/ ./src/
+    
+    # Run the server
+    CMD ["python", "src/weather_server.py"]
