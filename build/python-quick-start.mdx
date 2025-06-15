@@ -1,15 +1,15 @@
 ---
-title: 'FastMCP Quick Start'
-description: 'Build and deploy a Python MCP server in under 5 minutes using FastMCP and Smithery'
+title: 'Python Quick Start'
+description: 'Build and deploy a Python MCP server using FastMCP'
 ---
 
-# FastMCP Quick Start
+# Python Quick Start
 
-Build and deploy a Python MCP server in under 5 minutes using FastMCP's simplified API and Smithery's one-click deployment.
+Build and deploy a Python MCP server using FastMCP and Smithery.
 
-## Why FastMCP?
+## FastMCP vs Standard SDK
 
-FastMCP dramatically reduces boilerplate compared to the standard Python SDK:
+FastMCP reduces boilerplate compared to the standard Python SDK:
 
 <Tabs>
   <Tab title="Standard SDK (verbose)">
@@ -692,28 +692,6 @@ async def get_weather_safe(
         return {"error": "An unexpected error occurred"}
 ```
 
-## Why This Approach?
-
-<Card title="Minimal Boilerplate" icon="code">
-  FastMCP reduces setup code by ~80%
-</Card>
-
-<Card title="Type Safety" icon="shield-check">
-  Full type hints for better IDE support
-</Card>
-
-<Card title="Automatic Documentation" icon="book">
-  Docstrings become tool descriptions
-</Card>
-
-<Card title="Production Ready" icon="rocket">
-  Includes error handling, validation, and logging
-</Card>
-
-<Card title="Easy Deployment" icon="cloud">
-  One-click Smithery deployment with no Docker knowledge required
-</Card>
-
 ## Next Steps
 
 - Add more weather data sources
@@ -727,9 +705,3 @@ async def get_weather_safe(
 - [FastMCP Documentation](https://github.com/modelcontextprotocol/python-sdk)
 - [Smithery Discord](https://discord.gg/smithery)
 - [MCP Specification](https://modelcontextprotocol.io)
-
-<Note>
-  **Time to Deploy**: ~5 minutes  
-  **Lines of Code**: ~200 (vs ~400+ with standard SDK)  
-  **Production Ready**: ✅
-</Note>
