@@ -569,6 +569,12 @@ jobs:
         
         echo "✅ Cleanup completed"
 
+    - name: Force add build files (ignore .gitignore)
+      run: |
+        # Force add the build file since it's in .gitignore
+        git add -f build/deployments.mdx
+        echo "✅ Force added build/deployments.mdx"
+
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v5
       with:
