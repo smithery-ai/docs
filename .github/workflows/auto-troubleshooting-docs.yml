@@ -1,0 +1,238 @@
+name: Auto-Generate Troubleshooting Documentation
+
+on:
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  analyze-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Analyze GitHub Issues
+      id: analyze
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          
+          // Search queries for common deployment issues
+          const searchQueries = [
+            'repo:smithery-ai/docs deployment failed',
+            'repo:smithery-ai/docs SSL_ERROR_SYSCALL',
+            'repo:smithery-ai/docs HTTP 502',
+            'repo:smithery-ai/docs "container runtime"',
+            'repo:smithery-ai/docs dockerfile',
+            'repo:smithery-ai/mcp-servers deployment',
+            'repo:smithery-ai/mcp-servers error',
+            'org:smithery-ai "deployment failed"',
+            'org:smithery-ai "connection error"',
+            'org:smithery-ai "SSL error"'
+          ];
+          
+          const issues = [];
+          
+          // Collect issues from all search queries
+          for (const query of searchQueries) {
+            try {
+              const results = await github.rest.search.issuesAndPullRequests({
+                q: query,
+                sort: 'updated',
+                per_page: 20
+              });
+              issues.push(...results.data.items);
+            } catch (error) {
+              console.log(`Error searching: ${query}`, error.message);
+            }
+          }
+          
+          // Categorize issues
+          const categories = {
+            deployment: [],
+            ssl_connection: [],
+            http_errors: [],
+            container_runtime: [],
+            authentication: [],
+            other: []
+          };
+          
+          issues.forEach(issue => {
+            const text = (issue.title + ' ' + (issue.body || '')).toLowerCase();
+            
+            if (text.includes('deployment') || text.includes('deploy')) {
+              categories.deployment.push(issue);
+            } else if (text.includes('ssl') || text.includes('connection')) {
+              categories.ssl_connection.push(issue);
+            } else if (text.includes('502') || text.includes('400') || text.includes('401')) {
+              categories.http_errors.push(issue);
+            } else if (text.includes('container') || text.includes('docker')) {
+              categories.container_runtime.push(issue);
+            } else if (text.includes('auth') || text.includes('token') || text.includes('login')) {
+              categories.authentication.push(issue);
+            } else {
+              categories.other.push(issue);
+            }
+          });
+          
+          // Generate troubleshooting content
+          let troubleshootingContent = `## Troubleshooting Common Issues
+
+*Last updated: ${new Date().toISOString().split('T')[0]} (auto-generated)*
+
+### Deployment Issues
+
+`;
+          
+          if (categories.deployment.length > 0) {
+            troubleshootingContent += `
+**Common deployment problems and solutions:**
+
+`;
+            const deploymentPatterns = new Map();
+            categories.deployment.forEach(issue => {
+              const title = issue.title.toLowerCase();
+              if (title.includes('failed')) deploymentPatterns.set('deployment-failed', (deploymentPatterns.get('deployment-failed') || 0) + 1);
+              if (title.includes('timeout')) deploymentPatterns.set('timeout', (deploymentPatterns.get('timeout') || 0) + 1);
+              if (title.includes('build')) deploymentPatterns.set('build-error', (deploymentPatterns.get('build-error') || 0) + 1);
+            });
+            
+            if (deploymentPatterns.get('deployment-failed') > 0) {
+              troubleshootingContent += `
+#### Deployment Failed Errors
+
+If your deployment fails with generic error messages:
+
+1. **Check your \`smithery.yaml\` configuration**:
+   - Ensure \`runtime: "container"\` for Python/custom deployments
+   - Verify your \`dockerfile\` path is correct
+   - Confirm \`startCommand.type: "http"\` is set
+
+2. **Verify your Dockerfile**:
+   - Container must expose port via \`PORT\` environment variable
+   - Must serve HTTP endpoint at \`/mcp\`
+   - Should handle GET, POST, and DELETE requests
+
+3. **Check build context**:
+   - Ensure all required files are in \`dockerBuildPath\`
+   - Verify dependencies are properly installed in Dockerfile
+
+*Based on ${deploymentPatterns.get('deployment-failed')} recent reports*
+
+`;
+            }
+          }
+          
+          if (categories.ssl_connection.length > 0) {
+            troubleshootingContent += `
+### Connection & SSL Issues
+
+**SSL_ERROR_SYSCALL and connection failures:**
+
+1. **Server overload**: During peak times, servers may be overloaded
+   - Wait a few minutes and retry
+   - Check [Smithery status page](https://smithery.ai) for outages
+
+2. **Browser-specific issues**:
+   - Try a different browser (Edge often works when Chrome fails)
+   - Clear browser cache and cookies
+   - Disable browser extensions temporarily
+
+3. **Network configuration**:
+   - Check if your network blocks certain ports
+   - Try from a different network connection
+
+*Based on ${categories.ssl_connection.length} recent reports*
+
+`;
+          }
+          
+          if (categories.http_errors.length > 0) {
+            troubleshootingContent += `
+### HTTP Status Errors
+
+**Common HTTP error codes and solutions:**
+
+#### 401 Unauthorized
+- Verify your Smithery API key is correct
+- Check that the API key has proper permissions
+- Ensure you're using the correct authentication method
+
+#### 400 Bad Request  
+- Verify you're using **Streamable HTTP** transport (not SSE)
+- Check your request format matches MCP specification
+- Ensure proper Content-Type headers
+
+#### 502 Bad Gateway
+- Usually indicates server-side issues
+- Try again in a few minutes
+- Check if the specific MCP server is currently operational
+
+*Based on ${categories.http_errors.length} recent reports*
+
+`;
+          }
+          
+          // Save the generated content
+          fs.writeFileSync('troubleshooting-analysis.md', troubleshootingContent);
+          
+          return {
+            totalIssues: issues.length,
+            categoryCounts: Object.fromEntries(
+              Object.entries(categories).map(([k, v]) => [k, v.length])
+            )
+          };
+    
+    - name: Update deployments.mdx with troubleshooting
+      run: |
+        # Check if troubleshooting section exists
+        if ! grep -q "## Troubleshooting" build/deployments.mdx; then
+          # Add troubleshooting section to end of file
+          echo "" >> build/deployments.mdx
+          cat troubleshooting-analysis.md >> build/deployments.mdx
+        else
+          # Replace existing troubleshooting section
+          # This is a simple replacement - in production you'd want more sophisticated merging
+          sed -i '/## Troubleshooting/,$d' build/deployments.mdx
+          cat troubleshooting-analysis.md >> build/deployments.mdx
+        fi
+        
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "docs: auto-update troubleshooting based on GitHub issues analysis"
+        title: "Auto-generated troubleshooting documentation updates"
+        body: |
+          ## Auto-Generated Documentation Update
+          
+          This PR was automatically generated by analyzing recent GitHub issues across the Smithery ecosystem.
+          
+          **Analysis Summary:**
+          - Total issues analyzed: ${{ steps.analyze.outputs.totalIssues }}
+          - Categories found: ${{ steps.analyze.outputs.categoryCounts }}
+          
+          **Changes:**
+          - Updated troubleshooting section in `build/deployments.mdx`
+          - Added solutions for the most commonly reported issues
+          - Included frequency data to prioritize solutions
+          
+          Please review and merge if the updates look accurate.
+        branch: auto-troubleshooting-updates
+        delete-branch: true
