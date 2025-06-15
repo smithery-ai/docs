@@ -348,8 +348,7 @@ jobs:
               testResult.overallSuccess = testResult.tests.every(t => t.passed);
               testResults.push(testResult);
               
-              // Cleanup
-              execSync(`rm -rf test-repo-${repoName}`, { stdio: 'inherit' });
+              // Note: Cleanup will be done in separate step to avoid PR issues
               
             } catch (error) {
               console.log(`Failed to test ${repo.url}: ${error.message}`);
@@ -556,12 +555,30 @@ jobs:
           cat validated-troubleshooting.md >> build/deployments.mdx
         fi
 
+    - name: Cleanup test repositories before commit
+      run: |
+        # Remove any cloned test repositories to avoid git submodule issues
+        echo "🧹 Cleaning up test repositories..."
+        rm -rf test-repo-* || true
+        
+        # Also remove any other temporary files that shouldn't be committed
+        rm -f problem-repos.json test-results.json || true
+        
+        # Keep only the essential analysis files for the commit
+        ls -la *.json *.md || true
+        
+        echo "✅ Cleanup completed"
+
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v5
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         commit-message: "docs: auto-update troubleshooting with validated real-world solutions"
         title: "Auto-generated troubleshooting documentation (tested & validated)"
+        add-paths: |
+          build/deployments.mdx
+          analysis-data.json
+          validated-troubleshooting.md
         body: |
           ## Auto-Generated Documentation Update with Real-World Testing
           
