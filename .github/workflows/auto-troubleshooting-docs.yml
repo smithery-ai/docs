@@ -59,7 +59,7 @@ jobs:
               });
               issues.push(...results.data.items);
             } catch (error) {
-              console.log(`Error searching: ${query}`, error.message);
+              console.log('Error searching: ' + query, error.message);
             }
           }
           
@@ -92,19 +92,20 @@ jobs:
           });
           
           // Generate troubleshooting content
-          let troubleshootingContent = `## Troubleshooting Common Issues
-
-*Last updated: ${new Date().toISOString().split('T')[0]} (auto-generated)*
-
-### Deployment Issues
-
-`;
+          const currentDate = new Date().toISOString().split('T')[0];
+          let content = [];
+          
+          content.push('## Troubleshooting Common Issues');
+          content.push('');
+          content.push('*Last updated: ' + currentDate + ' (auto-generated)*');
+          content.push('');
+          content.push('### Deployment Issues');
+          content.push('');
           
           if (categories.deployment.length > 0) {
-            troubleshootingContent += `
-**Common deployment problems and solutions:**
-
-`;
+            content.push('**Common deployment problems and solutions:**');
+            content.push('');
+            
             const deploymentPatterns = new Map();
             categories.deployment.forEach(issue => {
               const title = issue.title.toLowerCase();
@@ -114,82 +115,77 @@ jobs:
             });
             
             if (deploymentPatterns.get('deployment-failed') > 0) {
-              troubleshootingContent += `
-#### Deployment Failed Errors
-
-If your deployment fails with generic error messages:
-
-1. **Check your \`smithery.yaml\` configuration**:
-   - Ensure \`runtime: "container"\` for Python/custom deployments
-   - Verify your \`dockerfile\` path is correct
-   - Confirm \`startCommand.type: "http"\` is set
-
-2. **Verify your Dockerfile**:
-   - Container must expose port via \`PORT\` environment variable
-   - Must serve HTTP endpoint at \`/mcp\`
-   - Should handle GET, POST, and DELETE requests
-
-3. **Check build context**:
-   - Ensure all required files are in \`dockerBuildPath\`
-   - Verify dependencies are properly installed in Dockerfile
-
-*Based on ${deploymentPatterns.get('deployment-failed')} recent reports*
-
-`;
+              content.push('#### Deployment Failed Errors');
+              content.push('');
+              content.push('If your deployment fails with generic error messages:');
+              content.push('');
+              content.push('1. **Check your smithery.yaml configuration**:');
+              content.push('   - Ensure runtime: "container" for Python/custom deployments');
+              content.push('   - Verify your dockerfile path is correct');
+              content.push('   - Confirm startCommand.type: "http" is set');
+              content.push('');
+              content.push('2. **Verify your Dockerfile**:');
+              content.push('   - Container must expose port via PORT environment variable');
+              content.push('   - Must serve HTTP endpoint at /mcp');
+              content.push('   - Should handle GET, POST, and DELETE requests');
+              content.push('');
+              content.push('3. **Check build context**:');
+              content.push('   - Ensure all required files are in dockerBuildPath');
+              content.push('   - Verify dependencies are properly installed in Dockerfile');
+              content.push('');
+              content.push('*Based on ' + deploymentPatterns.get('deployment-failed') + ' recent reports*');
+              content.push('');
             }
           }
           
           if (categories.ssl_connection.length > 0) {
-            troubleshootingContent += `
-### Connection & SSL Issues
-
-**SSL_ERROR_SYSCALL and connection failures:**
-
-1. **Server overload**: During peak times, servers may be overloaded
-   - Wait a few minutes and retry
-   - Check [Smithery status page](https://smithery.ai) for outages
-
-2. **Browser-specific issues**:
-   - Try a different browser (Edge often works when Chrome fails)
-   - Clear browser cache and cookies
-   - Disable browser extensions temporarily
-
-3. **Network configuration**:
-   - Check if your network blocks certain ports
-   - Try from a different network connection
-
-*Based on ${categories.ssl_connection.length} recent reports*
-
-`;
+            content.push('### Connection & SSL Issues');
+            content.push('');
+            content.push('**SSL_ERROR_SYSCALL and connection failures:**');
+            content.push('');
+            content.push('1. **Server overload**: During peak times, servers may be overloaded');
+            content.push('   - Wait a few minutes and retry');
+            content.push('   - Check [Smithery status page](https://smithery.ai) for outages');
+            content.push('');
+            content.push('2. **Browser-specific issues**:');
+            content.push('   - Try a different browser (Edge often works when Chrome fails)');
+            content.push('   - Clear browser cache and cookies');
+            content.push('   - Disable browser extensions temporarily');
+            content.push('');
+            content.push('3. **Network configuration**:');
+            content.push('   - Check if your network blocks certain ports');
+            content.push('   - Try from a different network connection');
+            content.push('');
+            content.push('*Based on ' + categories.ssl_connection.length + ' recent reports*');
+            content.push('');
           }
           
           if (categories.http_errors.length > 0) {
-            troubleshootingContent += `
-### HTTP Status Errors
-
-**Common HTTP error codes and solutions:**
-
-#### 401 Unauthorized
-- Verify your Smithery API key is correct
-- Check that the API key has proper permissions
-- Ensure you're using the correct authentication method
-
-#### 400 Bad Request  
-- Verify you're using **Streamable HTTP** transport (not SSE)
-- Check your request format matches MCP specification
-- Ensure proper Content-Type headers
-
-#### 502 Bad Gateway
-- Usually indicates server-side issues
-- Try again in a few minutes
-- Check if the specific MCP server is currently operational
-
-*Based on ${categories.http_errors.length} recent reports*
-
-`;
+            content.push('### HTTP Status Errors');
+            content.push('');
+            content.push('**Common HTTP error codes and solutions:**');
+            content.push('');
+            content.push('#### 401 Unauthorized');
+            content.push('- Verify your Smithery API key is correct');
+            content.push('- Check that the API key has proper permissions');
+            content.push('- Ensure you are using the correct authentication method');
+            content.push('');
+            content.push('#### 400 Bad Request');
+            content.push('- Verify you are using **Streamable HTTP** transport (not SSE)');
+            content.push('- Check your request format matches MCP specification');
+            content.push('- Ensure proper Content-Type headers');
+            content.push('');
+            content.push('#### 502 Bad Gateway');
+            content.push('- Usually indicates server-side issues');
+            content.push('- Try again in a few minutes');
+            content.push('- Check if the specific MCP server is currently operational');
+            content.push('');
+            content.push('*Based on ' + categories.http_errors.length + ' recent reports*');
+            content.push('');
           }
           
           // Save the generated content
+          const troubleshootingContent = content.join('\n');
           fs.writeFileSync('troubleshooting-analysis.md', troubleshootingContent);
           
           return {
