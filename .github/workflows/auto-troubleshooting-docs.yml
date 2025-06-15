@@ -564,6 +564,18 @@ jobs:
         # Also remove any other temporary files that shouldn't be committed
         rm -f problem-repos.json test-results.json || true
         
+        # Sanitize analysis data to remove potential secrets (API keys, tokens, etc.)
+        if [ -f analysis-data.json ]; then
+          echo "🔒 Sanitizing analysis data to remove potential secrets..."
+          # Remove common secret patterns from the analysis data
+          sed -i 's/xoxb-[0-9]*-[0-9]*-[a-zA-Z0-9]*/[REDACTED_SLACK_TOKEN]/g' analysis-data.json
+          sed -i 's/xoxp-[0-9]*-[0-9]*-[a-zA-Z0-9]*/[REDACTED_SLACK_TOKEN]/g' analysis-data.json
+          sed -i 's/sk-[a-zA-Z0-9]{48}/[REDACTED_OPENAI_KEY]/g' analysis-data.json
+          sed -i 's/ghp_[a-zA-Z0-9]{36}/[REDACTED_GITHUB_TOKEN]/g' analysis-data.json
+          sed -i 's/gho_[a-zA-Z0-9]{36}/[REDACTED_GITHUB_TOKEN]/g' analysis-data.json
+          echo "✅ Analysis data sanitized"
+        fi
+        
         # Keep only the essential analysis files for the commit
         ls -la *.json *.md || true
         
