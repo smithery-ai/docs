@@ -5,703 +5,413 @@ description: 'Build and deploy a Python MCP server using FastMCP'
 
 # Python Quick Start
 
-Build and deploy a Python MCP server using FastMCP and Smithery.
+Build a Python MCP server with FastMCP and deploy it on Smithery using the proper package structure.
 
-## FastMCP vs Standard SDK
+**FastMCP with proper Smithery deployment:**
+```python
+from mcp.server.fastmcp import FastMCP
 
-FastMCP reduces boilerplate compared to the standard Python SDK:
-
-<Tabs>
-  <Tab title="Standard SDK (verbose)">
-    ```python
-    import asyncio
-    from mcp.server import Server, NotificationOptions
-    from mcp.server.models import InitializationOptions
-    import mcp.server.stdio
-    import mcp.types as types
-
-    async def run():
-        server = Server("example-server")
-        
-        @server.list_tools()
-        async def handle_list_tools() -> list[types.Tool]:
-            return [
-                types.Tool(
-                    name="get_weather",
-                    description="Get weather for a city",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "city": {"type": "string"}
-                        },
-                        "required": ["city"]
-                    }
-                )
-            ]
-        
-        @server.call_tool()
-        async def handle_call_tool(
-            name: str, arguments: dict | None
-        ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-            if name == "get_weather":
-                return [types.TextContent(
-                    type="text",
-                    text=f"Weather in {arguments['city']}: Sunny, 72°F"
-                )]
-        
-        async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-            await server.run(
-                read_stream,
-                write_stream,
-                InitializationOptions(
-                    server_name="example-server",
-                    server_version="0.1.0",
-                    capabilities=server.get_capabilities(
-                        notification_options=NotificationOptions(),
-                        experimental_capabilities={},
-                    )
-                )
-            )
-
-    if __name__ == "__main__":
-        asyncio.run(run())
-    ```
-  </Tab>
-  <Tab title="FastMCP (simple)">
-    ```python
+def get_mcp():
+    """Lazy-loaded FastMCP instance to avoid import-time dependencies."""
     from mcp.server.fastmcp import FastMCP
+    return FastMCP("weather-server")
 
-    mcp = FastMCP("example-server")
-
+def setup_tools(mcp):
     @mcp.tool()
     async def get_weather(city: str) -> str:
         """Get weather for a city."""
         return f"Weather in {city}: Sunny, 72°F"
 
-    if __name__ == "__main__":
-        mcp.run()
-    ```
-  </Tab>
-</Tabs>
+def main():
+    mcp = get_mcp()
+    setup_tools(mcp)
+    mcp.run()  # Uses stdio transport for Smithery
 
-## Step 1: Create Your Project
+if __name__ == "__main__":
+    main()
+```
+
+## 1. Setup
 
 ```bash
-# Create project directory
 mkdir weather-mcp && cd weather-mcp
-
-# Initialize Python project
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Create requirements.txt
-cat > requirements.txt << EOF
-mcp>=1.0.0
-httpx>=0.25.0
-python-dotenv>=1.0.0
-EOF
-
-# Install dependencies
-pip install -r requirements.txt
+python -m venv venv && source venv/bin/activate
+pip install --upgrade pip
 ```
 
-## Step 2: Build Your MCP Server
-
-Create `src/weather_server.py`:
-
-```python
-"""
-Weather MCP Server - Get weather data for any city
-Built with FastMCP for simplicity
-"""
-from typing import Optional, Dict, Any
-from datetime import datetime
-from urllib.parse import quote
-import httpx
-import os
-from mcp.server.fastmcp import FastMCP
-
-# Initialize FastMCP with metadata
-mcp = FastMCP(
-    "weather-server",
-    version="1.0.0",
-    description="Get real-time weather data for any city"
-)
-
-# Use a free weather API (no key required for demo)
-WEATHER_API = "https://wttr.in"
-
-@mcp.tool()
-async def get_weather(
-    city: str,
-    units: str = "metric",
-    detailed: bool = False
-) -> Dict[str, Any]:
-    """
-    Get current weather for a city.
-    
-    Args:
-        city: City name (e.g., "London", "New York")
-        units: Temperature units - "metric" (°C) or "imperial" (°F)
-        detailed: Include extended forecast and additional data
-    
-    Returns:
-        Weather data including temperature, conditions, and optional forecast
-    """
-    # Validate inputs
-    if not city:
-        return {"error": "City name is required"}
-    
-    if units not in ["metric", "imperial"]:
-        return {"error": "Units must be 'metric' or 'imperial'"}
-    
-    try:
-        # Build API request
-        params = {
-            "format": "j1",  # JSON format
-            "m": "" if units == "metric" else "f"  # Units
-        }
-        
-        async with httpx.AsyncClient() as client:
-            # URL encode city name to handle spaces and special characters
-            encoded_city = quote(city)
-            response = await client.get(
-                f"{WEATHER_API}/{encoded_city}",
-                params=params,
-                timeout=10.0
-            )
-            response.raise_for_status()
-            
-        data = response.json()
-        current = data["current_condition"][0]
-        
-        # Build response
-        result = {
-            "city": city,
-            "temperature": f"{current['temp_C']}°C" if units == "metric" else f"{current['temp_F']}°F",
-            "feels_like": f"{current['FeelsLikeC']}°C" if units == "metric" else f"{current['FeelsLikeF']}°F",
-            "condition": current["weatherDesc"][0]["value"],
-            "humidity": f"{current['humidity']}%",
-            "wind": f"{current['windspeedKmph']} km/h" if units == "metric" else f"{current['windspeedMiles']} mph",
-            "wind_direction": current["winddir16Point"],
-            "uv_index": current["uvIndex"],
-            "visibility": f"{current['visibility']} km" if units == "metric" else f"{current['visibilityMiles']} miles",
-            "pressure": f"{current['pressure']} mb",
-            "updated": datetime.now().isoformat()
-        }
-        
-        # Add forecast if requested
-        if detailed:
-            forecast = []
-            for day in data["weather"][:3]:  # Next 3 days
-                forecast.append({
-                    "date": day["date"],
-                    "max_temp": f"{day['maxtempC']}°C" if units == "metric" else f"{day['maxtempF']}°F",
-                    "min_temp": f"{day['mintempC']}°C" if units == "metric" else f"{day['mintempF']}°F",
-                    "condition": day["hourly"][4]["weatherDesc"][0]["value"],  # Noon forecast
-                    "rain_chance": f"{day['hourly'][4]['chanceofrain']}%"
-                })
-            result["forecast"] = forecast
-            
-        return result
-        
-    except httpx.HTTPStatusError as e:
-        return {"error": f"Weather API error: {e.response.status_code}"}
-    except Exception as e:
-        return {"error": f"Failed to get weather: {str(e)}"}
-
-@mcp.tool()
-async def get_weather_alerts(
-    city: str,
-    severity: str = "all"
-) -> Dict[str, Any]:
-    """
-    Get weather alerts and warnings for a city.
-    
-    Args:
-        city: City name to check for alerts
-        severity: Filter by severity - "all", "high", "medium", "low"
-    
-    Returns:
-        Active weather alerts if any
-    """
-    # Simulated alerts for demo - in production, use a real alerts API
-    alerts_db = {
-        "miami": [
-            {
-                "type": "Hurricane Watch",
-                "severity": "high",
-                "description": "Tropical storm may strengthen to hurricane",
-                "expires": "2024-09-15T18:00:00Z"
-            }
-        ],
-        "denver": [
-            {
-                "type": "Winter Storm Warning",
-                "severity": "medium",
-                "description": "6-10 inches of snow expected",
-                "expires": "2024-12-22T12:00:00Z"
-            }
-        ]
-    }
-    
-    city_lower = city.lower()
-    alerts = alerts_db.get(city_lower, [])
-    
-    # Filter by severity if specified
-    if severity != "all":
-        alerts = [a for a in alerts if a["severity"] == severity]
-    
-    return {
-        "city": city,
-        "alerts": alerts,
-        "checked_at": datetime.now().isoformat()
-    }
-
-@mcp.tool()
-async def compare_weather(
-    cities: list[str],
-    metric: str = "temperature"
-) -> Dict[str, Any]:
-    """
-    Compare weather between multiple cities.
-    
-    Args:
-        cities: List of cities to compare (max 5)
-        metric: What to compare - "temperature", "humidity", "wind", "conditions"
-    
-    Returns:
-        Comparison data for the specified metric
-    """
-    if len(cities) > 5:
-        return {"error": "Maximum 5 cities for comparison"}
-    
-    if not cities:
-        return {"error": "At least one city required"}
-    
-    comparisons = []
-    
-    for city in cities:
-        weather = await get_weather(city, units="metric", detailed=False)
-        if "error" not in weather:
-            comparisons.append({
-                "city": city,
-                "temperature": weather["temperature"],
-                "humidity": weather["humidity"],
-                "wind": weather["wind"],
-                "condition": weather["condition"]
-            })
-    
-    # Sort by the requested metric
-    if metric == "temperature":
-        comparisons.sort(key=lambda x: float(x["temperature"].replace("°C", "")), reverse=True)
-    elif metric == "humidity":
-        comparisons.sort(key=lambda x: float(x["humidity"].replace("%", "")), reverse=True)
-    elif metric == "wind":
-        comparisons.sort(key=lambda x: float(x["wind"].split()[0]), reverse=True)
-    
-    return {
-        "metric": metric,
-        "cities": comparisons,
-        "timestamp": datetime.now().isoformat()
-    }
-
-# Entry point for the server
-if __name__ == "__main__":
-    mcp.run()
+**Required Project Structure for Smithery:**
+```
+weather-mcp/
+├── pyproject.toml           # Package configuration with console scripts
+├── smithery.yaml           # Smithery deployment configuration  
+├── Dockerfile              # Container build instructions
+└── weather_mcp/            # Python package directory
+    ├── __init__.py
+    └── server.py           # Main server code
 ```
 
-## Step 3: Add Configuration Support
+**Create the package structure:**
+```bash
+mkdir weather_mcp
+touch weather_mcp/__init__.py
+```
 
-Create `src/__init__.py` to configure for Smithery:
+## 2. Create Package Configuration
+
+`pyproject.toml`:
+```toml
+[project]
+name = "weather-mcp"
+version = "0.1.0"
+description = "MCP server for weather information"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp[cli]>=1.7.1",
+    "httpx>=0.25.0",
+    "uvicorn>=0.23.1"
+]
+
+[project.scripts]
+weather-mcp = "weather_mcp.server:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["weather_mcp"]
+```
+
+## 3. Build Your Server
+
+`weather_mcp/server.py`:
 
 ```python
-"""Weather MCP Server package configuration."""
-import os
 from typing import Dict, Any
-from .weather_server import mcp
+import os
 
-# Configuration schema for Smithery
-def get_server(config: Dict[str, Any] = None):
-    """
-    Factory function for Smithery deployment.
+# Lazy loading to prevent tool scanning timeouts
+def get_mcp():
+    """Lazy-loaded FastMCP instance to avoid import-time dependencies."""
+    from mcp.server.fastmcp import FastMCP
+    return FastMCP("weather-server")
+
+def get_http_client():
+    """Lazy-loaded HTTP client to avoid import-time dependencies."""
+    import httpx
+    return httpx.AsyncClient(timeout=10.0)
+
+def get_weather_api_url():
+    """Lazy-loaded weather API URL."""
+    return "https://wttr.in"
+
+def setup_tools(mcp):
+    """Setup tools on the MCP server instance."""
     
-    Args:
-        config: Configuration passed from Smithery
+    @mcp.tool()
+    async def ping() -> str:
+        """Simple ping tool to test server responsiveness and prevent timeouts."""
+        return "pong"
+
+    @mcp.tool()
+    async def health_check() -> Dict[str, Any]:
+        """Health check to verify server connectivity and status."""
+        from datetime import datetime
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "server": "weather-mcp",
+            "version": "1.0.0",
+            "tools_available": ["ping", "health_check", "get_weather", "compare_weather"]
+        }
+
+    @mcp.tool()
+    async def get_weather(city: str, units: str = "metric", detailed: bool = False) -> Dict[str, Any]:
+        """Get current weather for a city."""
+        if not city:
+            return {"error": "City name required"}
         
-    Returns:
-        Configured MCP server instance
-    """
-    # Apply any runtime configuration
-    if config:
-        # Example: Use custom API endpoint if provided
-        if "weather_api_url" in config:
-            import weather_server
-            weather_server.WEATHER_API = config["weather_api_url"]
-    
-    return mcp
+        try:
+            # Lazy load dependencies
+            from urllib.parse import quote
+            
+            async with get_http_client() as client:
+                response = await client.get(
+                    f"{get_weather_api_url()}/{quote(city)}",
+                    params={"format": "j1", "m": "" if units == "metric" else "f"}
+                )
+                response.raise_for_status()
+                
+            data = response.json()
+            current = data["current_condition"][0]
+            
+            result = {
+                "city": city,
+                "temperature": f"{current['temp_C']}°C" if units == "metric" else f"{current['temp_F']}°F",
+                "condition": current["weatherDesc"][0]["value"],
+                "humidity": f"{current['humidity']}%",
+                "wind": f"{current['windspeedKmph']} km/h" if units == "metric" else f"{current['windspeedMiles']} mph"
+            }
+            
+            if detailed:
+                result["forecast"] = [
+                    {
+                        "date": day["date"],
+                        "max": f"{day['maxtempC']}°C",
+                        "min": f"{day['mintempC']}°C",
+                        "condition": day["hourly"][4]["weatherDesc"][0]["value"]
+                    }
+                    for day in data["weather"][:3]
+                ]
+                
+            return result
+        except Exception as e:
+            return {"error": str(e)}
 
-# For local testing
-__all__ = ["mcp", "get_server"]
+    @mcp.tool()
+    async def compare_weather(cities: list[str], metric: str = "temperature") -> Dict[str, Any]:
+        """Compare weather between multiple cities."""
+        if not cities or len(cities) > 5:
+            return {"error": "Provide 1-5 cities"}
+        
+        comparisons = []
+        for city in cities:
+            weather = await get_weather(city)
+            if "error" not in weather:
+                comparisons.append({
+                    "city": city,
+                    "temperature": weather["temperature"],
+                    "humidity": weather["humidity"],
+                    "wind": weather["wind"]
+                })
+        
+        # Sort by metric
+        if metric in ["temperature", "humidity", "wind"]:
+            comparisons.sort(
+                key=lambda x: float(x[metric].split()[0].replace("°C", "").replace("%", "")), 
+                reverse=True
+            )
+        
+        return {"metric": metric, "cities": comparisons}
+
+def main():
+    """Main entry point for the weather MCP server."""
+    # Lazy initialization - only create mcp instance when needed
+    mcp = get_mcp()
+    setup_tools(mcp)
+    
+    print("🌐 Starting weather MCP server")
+    mcp.run()
+
+if __name__ == "__main__":
+    main()
 ```
 
-## Step 4: Create Smithery Configuration
+## 4. Configure for Smithery
 
-Create `smithery.yaml` in your project root:
-
+`smithery.yaml`:
 ```yaml
-runtime: python
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
 
-# Declare configuration schema (optional but recommended)
-configSchema:
-  type: object
-  properties:
-    weather_api_url:
-      type: string
-      description: "Custom weather API endpoint (optional)"
-      default: "https://wttr.in"
-    enable_alerts:
-      type: boolean
-      description: "Enable weather alerts feature"
-      default: true
-    cache_duration:
-      type: integer
-      description: "Cache duration in seconds"
-      default: 300
-      minimum: 60
-      maximum: 3600
-
-# Docker configuration for deployment
-build:
-  dockerfile: |
-    FROM python:3.11-slim
-    
-    WORKDIR /app
-    
-    # Install dependencies
-    COPY requirements.txt .
-    RUN pip install --no-cache-dir -r requirements.txt
-    
-    # Copy application
-    COPY src/ ./src/
-    
-    # Run the server
-    CMD ["python", "src/weather_server.py"]
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      units:
+        type: string
+        description: "Default units for weather (metric/imperial)"
+        default: "metric"
+        enum: ["metric", "imperial"]
+      timeout:
+        type: number
+        description: "Request timeout in seconds"
+        default: 10
+        minimum: 5
+        maximum: 30
+    default: {}
+    description: Weather MCP server configuration
+  commandFunction:
+    |-
+    (config) => ({command: 'weather-mcp'})
+  exampleConfig:
+    units: "metric"
+    timeout: 10
 ```
 
-## Step 5: Test Locally
+`Dockerfile`:
+```dockerfile
+# Generated by https://smithery.ai. See: https://smithery.ai/docs/config#dockerfile
+# syntax=docker/dockerfile:1
+FROM python:3.11-slim
 
-### Option A: Test with Your AI Client (Recommended)
+WORKDIR /app
 
-**The best way to test MCP servers is with the AI that will actually use them!**
+# Copy source
+COPY . /app
 
-**For Claude Desktop/Claude Code Users:**
+# Install Python dependencies and the MCP server
+RUN pip install --no-cache-dir .
 
-1. **Add to your MCP configuration file** (`claude_desktop_config.json` or `claude_code_mcp_config.json`):
+# Use the console script entrypoint
+CMD ["weather-mcp"]
+```
 
+**Key Requirements for Smithery:**
+- **Package Structure**: Must use proper Python package with `pyproject.toml`
+- **Console Script**: Define entry point in `[project.scripts]` section
+- **stdio Transport**: Use `mcp.run()` without transport parameter (defaults to stdio)
+- **Lazy Loading**: Use lazy imports to prevent tool scanning timeouts
+- **CommandFunction**: JavaScript function that generates CLI command
+
+## 5. Test Locally
+
+**Install and test the package:**
+```bash
+# Install in development mode
+pip install -e .
+
+# Test the console script
+weather-mcp
+```
+
+**Claude Desktop/Claude Code:**
 ```json
 {
   "mcpServers": {
     "weather-local": {
-      "command": "python",
-      "args": ["/absolute/path/to/your/weather-mcp/src/weather_server.py"],
-      "env": {
-        "PYTHONPATH": "/absolute/path/to/your/weather-mcp/venv/lib/python3.11/site-packages"
-      },
-      "alwaysAllow": [
-        "get_weather",
-        "get_weather_alerts",
-        "compare_weather"
-      ]
+      "command": "weather-mcp"
     }
   }
 }
 ```
 
-2. **Restart Claude Desktop/Claude Code**
-
-3. **Test your tools directly in conversation:**
-
-```
-Claude, get the weather for San Francisco with detailed forecast.
-
-Claude, check weather alerts for Miami.
-
-Claude, compare weather between New York, Los Angeles, and Chicago by temperature.
-```
-
-**For Other MCP Clients:**
-
-Create a simple test script to validate your server:
-
-```python
-# test_mcp_client.py
-import asyncio
-import subprocess
-import json
-import sys
-
-async def test_mcp_server():
-    """Test the MCP server using a simple JSON-RPC client."""
-    
-    # Start the server
-    process = subprocess.Popen(
-        [sys.executable, "src/weather_server.py"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-    
-    try:
-        # Initialize the server
-        init_message = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "test-client", "version": "1.0.0"}
-            }
-        }
-        
-        process.stdin.write(json.dumps(init_message) + "\n")
-        process.stdin.flush()
-        
-        # Test tool call
-        tool_call = {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": "get_weather_alerts",
-                "arguments": {"city": "Miami", "severity": "all"}
-            }
-        }
-        
-        process.stdin.write(json.dumps(tool_call) + "\n")
-        process.stdin.flush()
-        
-        # Read responses
-        for i in range(2):
-            response = process.stdout.readline()
-            if response.strip():
-                result = json.loads(response)
-                print(f"Response {i+1}: {json.dumps(result, indent=2)}")
-                
-    finally:
-        process.terminate()
-        process.wait()
-
-if __name__ == "__main__":
-    asyncio.run(test_mcp_server())
-```
-
-Run the test:
+**MCP Inspector:**
 ```bash
-python test_mcp_client.py
+npx @modelcontextprotocol/inspector weather-mcp
 ```
 
-### Validation Checklist
-
-✅ **Server starts without errors**  
-✅ **All three tools are registered** (`get_weather`, `get_weather_alerts`, `compare_weather`)  
-✅ **Tools respond with expected data structure**  
-✅ **Error handling works** (try invalid city names)  
-✅ **Parameter validation works** (try invalid units, empty cities list)  
-✅ **FastMCP decorators work correctly**
-
-### Option B: Test with MCP Inspector (Debugging Fallback)
-
-If you need to debug or want a visual interface:
+## 6. Deploy to Smithery
 
 ```bash
-# Test with MCP Inspector
-npx @modelcontextprotocol/inspector python src/weather_server.py
-
-# Alternatively, if you have the MCP CLI installed:
-# pip install mcp
-# npx @modelcontextprotocol/inspector mcp run src/weather_server.py
-
-# The inspector will open in your browser
-# Try these example commands:
-# - get_weather("London")
-# - get_weather("Tokyo", units="imperial", detailed=true)
-# - compare_weather(["New York", "Los Angeles", "Chicago"], metric="temperature")
-```
-
-<Note>
-  **AI-First Testing**: Remember, MCP servers are built for AI clients. Testing with the actual AI that will use your tools gives you the most realistic validation of your server's functionality and user experience.
-</Note>
-
-## Step 6: Deploy to Smithery
-
-### Push to GitHub
-
-```bash
-git init
-git add .
-git commit -m "Initial weather MCP server with FastMCP"
-git remote add origin YOUR_GITHUB_REPO
+git init && git add .
+git commit -m "Weather MCP server with proper Smithery structure"
 git push -u origin main
 ```
 
-### Deploy on Smithery
-
 1. Go to [smithery.ai/new](https://smithery.ai/new)
-2. Connect your GitHub repository
-3. Click "Deploy"
-4. Your server will be live in ~2 minutes!
+2. Connect your GitHub repository  
+3. Deploy! (Smithery will detect the package structure automatically)
 
-## Step 7: Use Your Deployed Server
+**Expected deployment output:**
+```
+Building Docker image...
+Successfully installed weather-mcp-0.1.0
+Deployment successful.
+Scanning for tools...
+Server tools successfully scanned.
+```
 
-Once deployed, users can connect to your server in multiple ways:
-
-### Claude Desktop Configuration
+## 7. Connect Your Server
 
 ```json
 {
   "mcpServers": {
     "weather": {
-      "url": "https://mcp.smithery.ai/your-username/weather-mcp",
-      "transport": "http",
-      "config": {
-        "enable_alerts": true,
-        "cache_duration": 600
-      }
+      "command": "npx",
+      "args": ["-y", "@smithery/cli", "run", "@username/weather-mcp"]
     }
   }
 }
 ```
 
-### Programmatic Access
+## Troubleshooting
 
+### Tool Scanning Timeout (MCP error -32001)
+**Root Cause**: Import-time dependencies cause FastMCP to timeout during tool discovery.
+
+**Solution**: Use lazy loading pattern:
 ```python
+# ❌ Incorrect (causes timeouts)
+from mcp.server.fastmcp import FastMCP
 import httpx
 
-async def use_weather_server():
-    # Direct HTTP calls to the deployed MCP server
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://mcp.smithery.ai/your-username/weather-mcp/call_tool",
-            json={
-                "tool": "get_weather",
-                "arguments": {"city": "Paris", "detailed": True}
-            },
-            headers={"Content-Type": "application/json"}
-        )
-        
-        result = response.json()
-        print(result)
+mcp = FastMCP("server")
+
+# ✅ Correct (lazy loading)
+def get_mcp():
+    from mcp.server.fastmcp import FastMCP
+    return FastMCP("server")
+
+def get_http_client():
+    import httpx
+    return httpx.AsyncClient()
 ```
 
-## Advanced Features
+### Package Structure Issues
+**Error**: `weather-mcp` command not found after deployment
 
-### Adding Caching
-
-FastMCP makes it easy to add caching with a simple cache implementation:
-
-```python
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
-
-# Simple in-memory cache
-weather_cache: Dict[str, Dict[str, Any]] = {}
-CACHE_DURATION = timedelta(minutes=5)
-
-@mcp.tool()
-async def get_weather_cached(city: str) -> Dict[str, Any]:
-    """Get weather with 5-minute cache."""
-    now = datetime.now()
-    cache_key = city.lower()
-    
-    # Check if we have cached data
-    if cache_key in weather_cache:
-        cached_data = weather_cache[cache_key]
-        if now - cached_data['timestamp'] < CACHE_DURATION:
-            return cached_data['data']
-    
-    # Fetch fresh data
-    fresh_data = await get_weather(city)
-    
-    # Cache the result
-    weather_cache[cache_key] = {
-        'data': fresh_data,
-        'timestamp': now
-    }
-    
-    return fresh_data
+**Solution**: Verify your `pyproject.toml` has correct console script:
+```toml
+[project.scripts]
+weather-mcp = "weather_mcp.server:main"  # Must match package structure
 ```
 
-### Adding Authentication
+### Function Definition Errors
+**Error**: "Internal error while deploying" after successful Docker build
 
-For APIs that require authentication:
+**Solution**: Check for:
+- Proper function indentation (tools should be at same level)
+- All tools have `@mcp.tool()` decorator
+- Functions are not nested inside each other
 
+## Best Practices
+
+### Lazy Loading Pattern
+Always use lazy loading to prevent tool scanning timeouts:
 ```python
-from mcp.server.fastmcp import FastMCP, Context
+def get_mcp():
+    """Lazy-loaded FastMCP instance to avoid import-time dependencies."""
+    from mcp.server.fastmcp import FastMCP
+    return FastMCP("server-name")
 
-# Pass context to access configuration
-@mcp.tool()
-async def get_premium_weather(city: str, context: Context) -> Dict[str, Any]:
-    """Get weather using premium API (requires API key in config)."""
-    config = context.config or {}
-    api_key = config.get("weather_api_key")
+def setup_tools(mcp):
+    """Setup tools on the MCP server instance."""
     
-    if not api_key:
-        return {"error": "API key required in configuration"}
-    
-    # Use the API key for authenticated requests
-    headers = {"Authorization": f"Bearer {api_key}"}
-    # ... make authenticated API call
+    @mcp.tool()
+    async def my_tool():
+        # Lazy load dependencies inside tools
+        import some_heavy_library
+        return some_heavy_library.process()
 ```
 
-### Error Handling Best Practices
-
+### Error Handling
+Include proper error handling in all tools:
 ```python
-from typing import Union
-import logging
-
-logger = logging.getLogger(__name__)
-
 @mcp.tool()
-async def get_weather_safe(
-    city: str
-) -> Union[Dict[str, Any], Dict[str, str]]:
-    """Get weather with comprehensive error handling."""
+async def api_call(query: str) -> Dict[str, Any]:
+    """Make an API call with proper error handling."""
     try:
-        if not city or not city.strip():
-            return {"error": "City name cannot be empty"}
-            
-        if len(city) > 100:
-            return {"error": "City name too long"}
-            
-        result = await get_weather(city)
-        return result
-        
-    except httpx.TimeoutException:
-        logger.error(f"Timeout getting weather for {city}")
-        return {"error": "Request timed out - try again"}
-        
-    except httpx.NetworkError:
-        logger.error(f"Network error for {city}")
-        return {"error": "Network connection failed"}
-        
+        async with get_http_client() as client:
+            response = await client.get(f"https://api.example.com/{query}")
+            response.raise_for_status()
+            return response.json()
     except Exception as e:
-        logger.error(f"Unexpected error for {city}: {e}")
-        return {"error": "An unexpected error occurred"}
+        return {"error": str(e)}
 ```
 
 ## Next Steps
 
-- Add more weather data sources
-- Implement weather maps using image responses
-- Add natural language parsing for dates/times
-- Create weather notification subscriptions
-- Build a forecast comparison tool
+- Add more sophisticated error handling and validation
+- Implement caching for API responses
+- Add authentication and rate limiting
+- Create comprehensive logging and monitoring
+- Add unit tests for your tools
 
-## Get Help
+## Resources
 
-- [FastMCP Documentation](https://github.com/modelcontextprotocol/python-sdk)
-- [Smithery Discord](https://discord.gg/smithery)
+- [FastMCP Documentation](https://github.com/jlowin/fastmcp)
+- [Smithery Documentation](https://smithery.ai/docs)
 - [MCP Specification](https://modelcontextprotocol.io)
+- [Example Repository](https://github.com/jiayao/mcp-chess) - Reference implementation
