@@ -44,7 +44,13 @@ jobs:
             'repo:smithery-ai/mcp-servers error',
             'org:smithery-ai "deployment failed"',
             'org:smithery-ai "connection error"',
-            'org:smithery-ai "SSL error"'
+            'org:smithery-ai "SSL error"',
+            // Add broader searches to find more repositories with issues
+            '"smithery deployment" "failed"',
+            '"MCP server" "deployment error"',
+            '"runtime: python" smithery',
+            '"dockerfile" "smithery.yaml" error',
+            '"HTTP 502" "mcp server"'
           ];
           
           const issues = [];
@@ -254,6 +260,35 @@ jobs:
                 });
               }
             });
+          });
+          
+          // Add known problematic repositories from Discord discussions
+          const knownFailingRepos = [
+            {
+              url: 'https://github.com/effieklimi/ensembl-mcp-server',
+              issueTitle: 'Discord report: deployment fails with generic error',
+              issueUrl: 'https://discord.com/channels/smithery-bugs',
+              category: 'deployment'
+            },
+            {
+              url: 'https://github.com/crakcode/Test_MCP',
+              issueTitle: 'Discord report: MCP deployment issue',
+              issueUrl: 'https://discord.com/channels/smithery-bugs',
+              category: 'deployment'
+            },
+            {
+              url: 'https://github.com/AidenYangX/mapbox-mcp-server',
+              issueTitle: 'Discord report: 400 Bad Request with AI SDK',
+              issueUrl: 'https://discord.com/channels/smithery-bugs',
+              category: 'http_errors'
+            }
+          ];
+          
+          // Add known failing repos if not already present
+          knownFailingRepos.forEach(knownRepo => {
+            if (!problemRepos.find(r => r.url === knownRepo.url)) {
+              problemRepos.push(knownRepo);
+            }
           });
           
           fs.writeFileSync('problem-repos.json', JSON.stringify(problemRepos, null, 2));
