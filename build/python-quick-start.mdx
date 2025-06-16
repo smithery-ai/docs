@@ -9,7 +9,6 @@ Build a Python MCP server with FastMCP and deploy it on Smithery using the prope
 
 **FastMCP with proper Smithery deployment:**
 ```python
-from mcp.server.fastmcp import FastMCP
 
 def get_mcp():
     """Lazy-loaded FastMCP instance to avoid import-time dependencies."""
@@ -269,6 +268,9 @@ CMD ["weather-mcp"]
 
 **Install and test the package:**
 ```bash
+# Ensure you're in the virtual environment
+source venv/bin/activate
+
 # Install in development mode
 pip install -e .
 
@@ -403,15 +405,19 @@ async def api_call(query: str) -> Dict[str, Any]:
 
 ## Next Steps
 
-- Add more sophisticated error handling and validation
-- Implement caching for API responses
-- Add authentication and rate limiting
-- Create comprehensive logging and monitoring
-- Add unit tests for your tools
+**Learn More About MCP:**
+- [Model Context Protocol Documentation](https://modelcontextprotocol.io/docs) - Official MCP docs
+- [FastMCP Documentation](https://github.com/jlowin/fastmcp) - Deep dive into FastMCP features
+- [MCP Specification](https://spec.modelcontextprotocol.io/) - Technical protocol specification
+- [MCP Python SDK: FastMCP examples](https://github.com/modelcontextprotocol/python-sdk/tree/main/examples/fastmcp)
 
-## Resources
+**Explore Smithery:**
+- [Browse popular MCP Servers](https://smithery.ai/search?q=is%3Adeployed) - See what others have built
+- [Smithery Examples](https://github.com/smithery-ai/mcp-servers) - MCP servers built by the team at Smithery
+- [Advanced Configuration](https://smithery.ai/docs/config) - Environment variables, secrets, and more
 
-- [FastMCP Documentation](https://github.com/jlowin/fastmcp)
-- [Smithery Documentation](https://smithery.ai/docs)
-- [MCP Specification](https://modelcontextprotocol.io)
-- [Example Repository](https://github.com/jiayao/mcp-chess) - Reference implementation
+**Join the Community:**
+- [Smithery Discord](https://discord.gg/4H3bj5Rn9d) - Get help and share your servers
+- [Smithery Server Requests](https://github.com/smithery-ai/rfm/discussions) - Want a server that's not available yet? Ask the community to build it!
+
+
