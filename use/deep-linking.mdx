@@ -17,18 +17,19 @@ To get started with integration, please contact us at [contact@smithery.ai](mail
 Deep links use the following URL format:
 
 ```typescript
-`${clientScheme}://mcp/install?name=${encodeURIComponent(displayName)}&config=${encodeURIComponent(config)}`
+`${clientScheme}://{optionalDeepLinkHandler}/mcp/install?name=${encodeURIComponent(displayName)}&config=${encodeURIComponent(config)}`
 
 // Example:
-// <client-scheme>://mcp/install?<server-display-name>&<base64-encoded-json-config>
+// cursor://anysphere.cursor-deeplink/mcp/install?<server-display-name>&<base64-encoded-json-config>
 ```
 
-| **Component**       | **Description**                                       |
-| :------------------ | :---------------------------------------------------- |
-| `{clientSchema}://` | Your client protocol scheme                           |
-| `/mcp/install`      | Path                                                  |
-| `name`              | Query parameter for the server's display name         |
-| `config`            | Query parameter for base64 encoded JSON configuration |
+| **Component**        | **Description**                                       |
+| :------------------- | :---------------------------------------------------- |
+| `{client-schema}://` | Protocol scheme                                       |
+| `{optional-handler}` | Deeplink handler                                      |
+| `/mcp/install`       | Path                                                  |
+| `name`               | Query parameter for the server name                   |
+| `config`             | Query parameter for base64 encoded JSON configuration |
 
 The `config` parameter contains a URL-encoded JSON object with the following schema:
 
