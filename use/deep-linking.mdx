@@ -1,32 +1,39 @@
 ---
-title: 'Integration with Deep Links'
-description: 'Deep links provide a seamless way to integrate Smithery MCPs into supported clients.'
+title: "Integration with Deep Links"
+description: "Deep links provide a seamless way to integrate Smithery MCPs into supported clients."
 ---
 
 # Integration with Deep Links
 
-Deep links provide a seamless way to integrate Smithery MCPs into supported clients. 
+Deep links provide a seamless way to integrate Smithery MCPs into supported clients.
 When a user clicks a deep link from our server page, the client automatically configures the MCP with the correct settings.
 
-To get started with integration, please contact us at contact@smithery.ai or join our [Discord community](https://discord.gg/sKd9uycgH9) for support.
+To get started with integration, please contact us at [contact@smithery.ai](mailto:contact@smithery.ai) or join our [Discord community](https://discord.gg/sKd9uycgH9) for support.
 
 ![Magic Link Integration Flow](/images/magic_link_flow.png)
 
 ## Protocol Specification
 
 Deep links use the following URL format:
+
 ```typescript
-`${clientScheme}:mcp/install?${encodeURIComponent(config)}`
+`${clientScheme}://mcp/install?name=${encodeURIComponent(displayName)}&config=${encodeURIComponent(config)}`
 
 // Example:
-// vscode:mcp/install?<url-encoded-json-config>
+// <client-scheme>://mcp/install?<server-display-name>&<base64-encoded-json-config>
 ```
+
+| **Component**       | **Description**                                       |
+| :------------------ | :---------------------------------------------------- |
+| `{clientSchema}://` | Your client protocol scheme                           |
+| `/mcp/install`      | Path                                                  |
+| `name`              | Query parameter for the server's display name         |
+| `config`            | Query parameter for base64 encoded JSON configuration |
 
 The `config` parameter contains a URL-encoded JSON object with the following schema:
 
 ```typescript
 interface StdioMCPConfig {
-  name: string;    // Qualified name of the MCP server
   type: "stdio";
   command: string; // Example: "npx"
   args: string[];  // Command line arguments for the MCP CLI
@@ -36,7 +43,6 @@ interface StdioMCPConfig {
 // Smithery automatically handles sensitive data through saved configurations.
 
 interface HttpMCPConfig {
-  name: string;   // Qualified name of the MCP server
   type: "http";
   url: string;    // URL of the MCP server
 }
@@ -46,20 +52,19 @@ type MCPConfig = StdioMCPConfig | HttpMCPConfig;
 
 The configuration fields are detailed in the table below:
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| name | Name of the server (required for all types) | `"Desktop Commander"` |
-| type | Server connection type | `"stdio"` or `"http"` |
-| command | Command to start the server executable (required for stdio type). The command needs to be available on your system path or contain its full path. | `"npx"` |
-| args | Array of arguments passed to the command (required for stdio type). | `["-y", "@smithery/cli@latest", "run", "@wonderwhy-er/desktop-commander"]` |
-| url | URL of the MCP server (required for http type) | `"https://server.smithery.ai/exa/mcp"` |
+| Field   | Description                                                                                                                                       | Example                                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| type    | Server connection type                                                                                                                            | `"stdio"` or `"http"`                                                      |
+| command | Command to start the server executable (required for stdio type). The command needs to be available on your system path or contain its full path. | `"npx"`                                                                    |
+| args    | Array of arguments passed to the command (required for stdio type).                                                                               | `["-y", "@smithery/cli@latest", "run", "@wonderwhy-er/desktop-commander"]` |
+| url     | URL of the MCP server (required for http type)                                                                                                    | `"https://server.smithery.ai/exa/mcp"`                                     |
 
 ## Example Configurations
 
 ### stdio-based Configuration:
+
 ```json
 {
-  "name": "Desktop Commander",
   "type": "stdio",
   "command": "npx",
   "args": ["-y", "@smithery/cli@latest", "run", "@wonderwhy-er/desktop-commander"]
@@ -67,9 +72,9 @@ The configuration fields are detailed in the table below:
 ```
 
 ### HTTP-based Configuration:
+
 ```json
 {
-  "name": "Exa Search",
   "type": "http",
   "url": "https://server.smithery.ai/exa/mcp"
 }
@@ -88,10 +93,12 @@ Example implementation:
 ### Deeplink Handler
 
 ```typescript
-// Parse deeplink and return config
-function handleMagicLink(url: string) {
-  const configStr = url.split('?')[1]
-  return JSON.parse(decodeURIComponent(configStr))
+// Parse deeplink and return name and config
+function handleDeepLink(url: string) {
+  const urlObj = new URL(url)
+  const name = urlObj.searchParams.get('name')
+  const config = JSON.parse(decodeURIComponent(urlObj.searchParams.get('config')))
+  return { config, name }
 }
 ```
 
