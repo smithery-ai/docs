@@ -36,6 +36,7 @@
         "pages": [
           "build/index",
           "build/getting-started",
+          "build/python-quick-start",
           "build/deployments"
         ]
       },
