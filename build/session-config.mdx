@@ -60,16 +60,12 @@ When connecting to an MCP server, clients must provide a configuration that sati
 1. **Retrieve the schema**: The [Registry API](/use/registry) returns the `configSchema` as part of the server connection details
 2. **Send the config**: When establishing a connection, provide the configuration using dot-notation query parameters in the [connection URL](/use/connect). For example, `?server.host=localhost&server.port=8080&debug=true`.
 
+Users who connect to your server on Smithery may prefer to use [Configuration Profiles](/use/profiles). When a profile is used, Smithery's gateway injects the correct query parameters when connecting to your MCP server.
+
 #### Reserved Parameters
 The following parameters are reserved and won't be passed to servers:
 - `api_key` (Smithery authentication)
 - `profile` (saved configuration profiles)
-
-You can also save configurations for reuse with [Configuration Profiles](/use/profiles), which eliminates the need to re-enter configs each time.
-
-## Security
-
-Configurations sometimes contain sensitive information like API keys. It's recommended for users to save sensitive keys on Smithery as [profiles](/use/profiles) to avoid passing them in the connection URL.
 
 ## Examples
 

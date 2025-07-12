@@ -1,17 +1,13 @@
 ---
 title: "Registry API"
-description: "The Smithery Registry API provides a programmatic way to search for MCP servers."
+description: "Programmatically search for MCP servers."
 ---
 
-The Smithery Registry API provides a programmatic way to search for MCP servers. This documentation will walk you through using the Registry API to obtain a remote MCP server.
-
-## Concepts
-
-Our registry contains an index of MCP servers. Every server may have different ways of launching or connecting to them. Server authors specify a [configuration schema](/build/project-config), which is a JSON schema that defines the structure of the configuration that is required to connect to the server.
+The Smithery Registry API provides a programmatic way to search for MCP servers hosted and listed in our registry. This documentation will walk you through using the Registry API to obtain metadata about an MCP server.
 
 ## Authentication
 
-All endpoints require authentication via a bearer token. You can create an API key [here](https://smithery.ai/account/api-keys).
+All registry API endpoints require authentication via a bearer token. You can create an API key [here](https://smithery.ai/account/api-keys).
 
 Include the following header in your API requests:
 

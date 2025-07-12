@@ -1,48 +1,13 @@
 ---
 title: 'Use MCPs'
-description: 'This guide explains how to integrate Smithery into your application (MCP Client).'
+description: 'Learn how to integrate Model Context Protocol servers into your AI agents.'
 ---
 
-# Introduction
-
-This guide explains how to integrate Smithery into your application (MCP Client).
+Smithery provides AI agent developers with access to a large ecosystem of Model Context Protocol (MCP) servers. Whether you're building chatbots, background agents, or AI copilots, Smithery simplifies MCP integration by exposing it to you via a unified gateway, authentication, and streamlined configuration management.
 
 **Benefits of using Smithery:**
 
-- Access a large catalog of MCP servers through a single gateway
-- No need to manage auth secrets and configurations
-
-## Integration Approaches
-
-At a high-level, there are two main ways to integrate Smithery with your client application:
-
-### 1. Direct User Authentication (Simpler)
-
-With this simpler approach, users authenticate directly with Smithery:
-
-- When needed, your application redirects users to create their own Smithery accounts
-- Smithery handles storing auth secrets and configurations for the user
-- Your client only needs the user's Smithery API key to establish connections
-
-**Benefits:**
-- Simpler implementation for client developers
-- Reduced security burden on your application
-- Users can reuse their configurations across multiple clients
-
-### 2. White-Label Integration
-
-With this approach, your application authenticates with Smithery under your developer account and proxies user connections:
-
-- Your application manages user secrets and configurations
-- You authenticate with Smithery using your developer credentials
-- You send user configurations with each connection request
-
-**Benefits:**
-- Fully white-labeled experience within your application
-- Complete control over the user experience
-- No need for users to create Smithery accounts
-
-**Considerations:**
-- More complex implementation
-- Your application must securely store user secrets
-- You must send configuration with each connection request
+- **Server Registry**: Access thousands of MCP servers built by the community
+- **Unified Gateway**: Connect to MCP servers through a single, unified API
+- **Managed Authentication**: Let Smithery handle OAuth flows and API key management
+- **Configuration Profiles**: Save and reuse server configurations across projects

@@ -25,7 +25,6 @@
           "use/index",
           "use/registry",
           "use/connect",
-          "use/session-config",
           "use/profiles",
           "use/data-policy",
           "use/deep-linking"
@@ -36,23 +35,25 @@
         "pages": [
           "build/index",
           "build/getting-started",
-          "build/deployments"
-        ]
-      },
-      {
-        "group": "Project Configuration",
-        "pages": [
-          "build/project-config/index",
-          "build/project-config/dockerfile",
-          "build/project-config/smithery-yaml"
-        ]
-      },
-      {
-        "group": "Permissions",
-        "pages": [
-          "build/permissions"
+          "build/deployments",
+          "build/session-config",
+          {
+            "group": "Project Configuration",
+            "pages": [
+              "build/project-config/index",
+              "build/project-config/dockerfile",
+              "build/project-config/smithery-yaml"
+            ]
+          },
+          {
+            "group": "Permissions",
+            "pages": [
+              "build/permissions"
+            ]
+          }
         ]
       }
+      
     ]
   },
   "icons": {
