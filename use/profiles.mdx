@@ -1,137 +1,68 @@
 ---
-title: 'Configuration Profiles'
-description: 'Learn how to use configuration profiles to group session configurations and supply them to your AI agents.'
+title: 'Profiles'
+description: 'Learn how profiles help you manage different contexts and credentials when connecting to MCP servers.'
 ---
 
-<Info>
-  Profiles are currently under active development. We'd love to hear your feedback and suggestions in our <a href="https://discord.gg/Afd38S5p9A">Discord community</a>!
-</Info>
+Profiles allow you to maintain multiple configurations and authentication contexts for the same MCP server. Think of profiles like different user accounts on your computer - each profile has its own settings, credentials, and context that determine how you interact with MCP servers.
 
-Configuration profiles (or **profiles** for short) are a way for you to group [session configurations](/build/session-config) and supply them to your AI agents. 
-Think of it like login profiles in your desktop, which let you decide what applications are installed and what accesses a user has in your computer.
-In a similar way, profiles let you bundle specific servers and their configurations to your agent.
+## Why Use Profiles?
 
-## Examples
+Profiles solve the challenge of **context switching** when working with MCP servers. Common scenarios include:
 
-Say you're building a coding assistant. A "Coding Assistant" profile could connect Gitingest MCP for code repository access, Memory Tool for storing context, and Context7 for semantic search - giving your agent everything it needs to help with coding tasks.
+- Accessing different workspaces in the same service (e.g., personal vs work Notion accounts)
+- Using different API credentials for development vs production environments
+- Connecting to the same MCP server multiple times with different settings
 
-Instead of managing multiple API keys and configurations separately, profiles let you bundle them together and reuse them across your agents. Here's how it works:
+Instead of reconfiguring connections each time, profiles let you save and switch between contexts seamlessly.
 
-To add servers to your profile, you can:
-- From any server page, select the profile you want to add the server to and click "Connect"
-- From Account > Profiles, select your profile and use the "Add Server" search bar shown below
+## How Profiles Work
+
+Each profile stores:
+
+- **Authentication credentials**: OAuth tokens or API keys specific to that context
+- **[Session configuration](/build/session-config)**: Custom settings that modify how the server behaves
+
+For example, you might have:
+- A "Personal" profile connected to your personal Notion workspace
+- A "Work" profile connected to your company's Notion workspace
+
+Once set up, you can switch between them without re-authenticating.
+
+## Using Profiles with OAuth
+
+When connecting to MCP servers through [Smithery's OAuth flow](/use/connect#connecting-with-oauth):
+
+1. During authentication, you select which profile to use
+2. OAuth tokens are bound to your selected profile
+3. Future connections use the saved credentials automatically
+
+This means you authenticate once per profile, and Smithery handles token management for you.
+
+## Managing Profiles
+
+### Create a Profile
+
+1. Go to [Account > Profiles](https://smithery.ai/account/profiles)
+2. Click "Create Profile"
+3. Name it descriptively (e.g., "Work Projects", "Personal Research")
+
+### Add Servers to Profiles
+
+- **From a server page**: Click "Connect" and select your profile
+- **From profile settings**: Use the "Add Server" search to find and add servers
 
 ![Profiles View](/images/profiles.png)
 
-## Using Profiles with Individual Servers
+## Common Use Cases
 
-When connecting to individual servers, you can use your profile to automatically load the saved configuration:
+**Development Workflows**: Separate profiles for dev, staging, and production environments
 
-```typescript
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { createSmitheryUrl } from "@smithery/sdk/shared/config.js"
+**Team Collaboration**: Individual profiles with personalized configurations while sharing the same MCP servers
 
-// Get your profile ID from the Smithery Profile page (e.g. "ratty-jay-1nmAzn")
-const profileId = "your-profile-id"
-const apiKey = "your-smithery-api-key"
+**Multi-Tenant Applications**: Isolate each client's data and configuration in different profiles
 
-// Create URL with profile in config
-const url = createSmitheryUrl(
-  "https://server.smithery.ai/gitingest/mcp",
-  { profile: profileId },
-  apiKey
-)
+## Next Steps
 
-const transport = new StreamableHTTPClientTransport(url)
-
-// Create and configure the client
-const client = new Client({
-  name: "Coding Assistant",
-  version: "1.0.0"
-})
-
-// Connect to the specific MCP server
-await client.connect(transport)
-```
-
-## Using Profiles with Toolbox
-
-The [Toolbox](https://smithery.ai/server/@smithery/toolbox) is a special MCP server that can load all tools from your profile at once. This is useful when you want to access all your configured servers in a single connection:
-
-```typescript
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { createSmitheryUrl } from "@smithery/sdk/shared/config.js"
-
-// Get your profile ID from the Smithery Profile page (e.g. "ratty-jay-1nmAzn")
-const profileId = "your-profile-id"
-const apiKey = "your-smithery-api-key"
-
-// Create URL with profile in config
-const url = createSmitheryUrl(
-  "https://server.smithery.ai/@smithery/toolbox/mcp",
-  { profile: profileId },
-  apiKey
-)
-
-const transport = new StreamableHTTPClientTransport(url)
-
-// Create and configure the client
-const client = new Client({
-  name: "Coding Assistant",
-  version: "1.0.0"
-})
-
-// Connect to the toolbox - this will load all tools from your profile
-await client.connect(transport)
-```
-
-Instead of the typical way where you'd need to specify all configurations:
-
-```typescript
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { createSmitheryUrl } from "@smithery/sdk/shared/config.js"
-
-// Configure each server separately with their own API keys and settings
-const exaUrl = createSmitheryUrl(
-  "https://servers.smithery.ai/exa",
-  {
-    config: {
-      api_key: "your-exa-api-key",
-    },
-  }
-)
-const exaTransport = new StreamableHTTPClientTransport(exaUrl)
-
-const zoteroUrl = createSmitheryUrl(
-  "https://servers.smithery.ai/zotero",
-  {
-    config: {
-      api_key: "your-zotero-api-key",
-      library_id: "your-library-id",
-      collection_key: "your-collection",
-    },
-  }
-)
-const zoteroTransport = new StreamableHTTPClientTransport(zoteroUrl)
-
-const pubmedUrl = createSmitheryUrl(
-  "https://servers.smithery.ai/pubmed",
-  {
-    config: {
-      api_key: "your-pubmed-api-key",
-      database: "pubmed",
-      max_results: 10,
-    },
-  }
-)
-const pubmedTransport = new StreamableHTTPClientTransport(pubmedUrl)
-
-// ... and so on for each server you want to connect to
-```
-
-Configuration profiles act as a default configuration fallback and makes all saved configuration fields optional. You can still pass configuration fields upon connecting to overwrite the default profile configuration.
-
-Obviously, this is not very useful if you're only connecting to one MCP. It becomes handy when you have multiple MCPs and you don't want to specify configurations for each of them.
-Some MCPs require OAuth, which may have complex configurations. Smithery provides an integrated OAuth flow that handles authentication automatically - see [Connecting with OAuth](/use/connect#connecting-with-oauth) for details.
+- Learn about [Connecting to MCPs](/use/connect) with OAuth
+- Understand [Session Configuration](/build/session-config) options
+- Browse available servers on the [Smithery Registry](https://smithery.ai)
