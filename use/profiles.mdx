@@ -3,8 +3,6 @@ title: 'Configuration Profiles'
 description: 'Learn how to use configuration profiles to group session configurations and supply them to your AI agents.'
 ---
 
-# Configuration Profiles
-
 <Info>
   Profiles are currently under active development. We'd love to hear your feedback and suggestions in our <a href="https://discord.gg/Afd38S5p9A">Discord community</a>!
 </Info>
@@ -32,7 +30,7 @@ When connecting to individual servers, you can use your profile to automatically
 ```typescript
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { createSmitheryUrl } from "@smithery/sdk/config.js"
+import { createSmitheryUrl } from "@smithery/sdk/shared/config.js"
 
 // Get your profile ID from the Smithery Profile page (e.g. "ratty-jay-1nmAzn")
 const profileId = "your-profile-id"
@@ -64,7 +62,7 @@ The [Toolbox](https://smithery.ai/server/@smithery/toolbox) is a special MCP ser
 ```typescript
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { createSmitheryUrl } from "@smithery/sdk/config.js"
+import { createSmitheryUrl } from "@smithery/sdk/shared/config.js"
 
 // Get your profile ID from the Smithery Profile page (e.g. "ratty-jay-1nmAzn")
 const profileId = "your-profile-id"
@@ -93,7 +91,7 @@ Instead of the typical way where you'd need to specify all configurations:
 
 ```typescript
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { createSmitheryUrl } from "@smithery/sdk/config.js"
+import { createSmitheryUrl } from "@smithery/sdk/shared/config.js"
 
 // Configure each server separately with their own API keys and settings
 const exaUrl = createSmitheryUrl(
@@ -136,4 +134,4 @@ const pubmedTransport = new StreamableHTTPClientTransport(pubmedUrl)
 Configuration profiles act as a default configuration fallback and makes all saved configuration fields optional. You can still pass configuration fields upon connecting to overwrite the default profile configuration.
 
 Obviously, this is not very useful if you're only connecting to one MCP. It becomes handy when you have multiple MCPs and you don't want to specify configurations for each of them.
-Some MCPs require OAuth, which may have complex configurations. In the future, you can authenticate via the UI on Smithery instead of offloading it to your end users.
+Some MCPs require OAuth, which may have complex configurations. Smithery provides an integrated OAuth flow that handles authentication automatically - see [Connecting with OAuth](/use/connect#connecting-with-oauth) for details.
