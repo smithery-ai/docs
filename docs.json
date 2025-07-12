@@ -45,12 +45,7 @@
               "build/project-config/smithery-yaml"
             ]
           },
-          {
-            "group": "Permissions",
-            "pages": [
-              "build/permissions"
-            ]
-          }
+          "build/permissions"
         ]
       }
       
