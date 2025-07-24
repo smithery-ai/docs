@@ -1,0 +1,545 @@
+{
+	"openapi": "3.1.0",
+	"info": {
+		"title": "Smithery Registry API",
+		"description": "API for managing servers, profiles, and configurations",
+		"version": "1.0.0"
+	},
+	"servers": [
+		{
+			"url": "https://registry.smithery.ai",
+			"description": "Production API"
+		}
+	],
+	"components": {
+		"securitySchemes": {
+			"bearerAuth": {
+				"type": "http",
+				"scheme": "bearer",
+				"bearerFormat": "API Key",
+				"description": "Bearer token authentication using API key"
+			}
+		},
+		"schemas": {
+			"Health": {
+				"type": "object",
+				"properties": {
+					"status": {
+						"type": "string"
+					},
+					"timestamp": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"status",
+					"timestamp"
+				]
+			},
+			"ServersListResponse": {
+				"type": "object",
+				"properties": {
+					"servers": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"qualifiedName": {
+									"type": "string",
+									"example": "smithery/hello-world"
+								},
+								"displayName": {
+									"type": [
+										"string",
+										"null"
+									],
+									"example": "Hello World"
+								},
+								"description": {
+									"type": [
+										"string",
+										"null"
+									],
+									"example": "A simple hello world server"
+								},
+								"useCount": {
+									"type": "number",
+									"example": 42
+								},
+								"remote": {
+									"type": "boolean",
+									"example": true
+								},
+								"createdAt": {
+									"type": "string"
+								},
+								"homepage": {
+									"type": "string",
+									"example": "https://smithery.ai/server/smithery/hello-world"
+								}
+							},
+							"required": [
+								"qualifiedName",
+								"displayName",
+								"description",
+								"useCount",
+								"remote",
+								"createdAt",
+								"homepage"
+							]
+						}
+					},
+					"pagination": {
+						"type": "object",
+						"properties": {
+							"currentPage": {
+								"type": "number",
+								"example": 1
+							},
+							"pageSize": {
+								"type": "number",
+								"example": 10
+							},
+							"totalPages": {
+								"type": "number",
+								"example": 5
+							},
+							"totalCount": {
+								"type": "number",
+								"example": 42
+							}
+						},
+						"required": [
+							"currentPage",
+							"pageSize",
+							"totalPages",
+							"totalCount"
+						]
+					}
+				},
+				"required": [
+					"servers",
+					"pagination"
+				]
+			},
+			"Error": {
+				"type": "object",
+				"properties": {
+					"error": {
+						"type": "string",
+						"example": "Server not found"
+					}
+				},
+				"required": [
+					"error"
+				]
+			},
+			"ServersQuery": {
+				"type": "object",
+				"properties": {
+					"page": {
+						"type": "string",
+						"example": "1"
+					},
+					"pageSize": {
+						"type": "string",
+						"example": "10"
+					},
+					"q": {
+						"type": "string",
+						"example": "search term"
+					}
+				}
+			},
+			"Server": {
+				"type": "object",
+				"properties": {
+					"qualifiedName": {
+						"type": "string",
+						"example": "@smithery/sample-server",
+						"description": "The qualified name of the server"
+					},
+					"displayName": {
+						"type": "string",
+						"example": "Sample Server"
+					},
+					"description": {
+						"type": "string",
+						"example": "A sample server for testing"
+					},
+					"iconUrl": {
+						"type": [
+							"string",
+							"null"
+						],
+						"example": "https://example.com/icon.png"
+					},
+					"remote": {
+						"type": "boolean",
+						"example": true
+					},
+					"deploymentUrl": {
+						"type": [
+							"string",
+							"null"
+						],
+						"example": "https://api.example.com"
+					},
+					"connections": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string",
+									"example": "stdio"
+								},
+								"url": {
+									"type": "string",
+									"example": "https://api.example.com"
+								},
+								"configSchema": {}
+							},
+							"required": [
+								"type"
+							]
+						}
+					},
+					"security": {
+						"type": [
+							"object",
+							"null"
+						],
+						"properties": {
+							"scanPassed": {
+								"type": "boolean",
+								"example": true
+							}
+						},
+						"required": [
+							"scanPassed"
+						]
+					},
+					"tools": {
+						"type": [
+							"array",
+							"null"
+						],
+						"items": {
+							"type": "object",
+							"properties": {
+								"name": {
+									"type": "string",
+									"example": "say_hello"
+								},
+								"description": {
+									"type": [
+										"string",
+										"null"
+									],
+									"example": "Say hello to the user"
+								},
+								"inputSchema": {
+									"type": "object",
+									"properties": {
+										"type": {
+											"type": "string",
+											"const": "object"
+										},
+										"properties": {
+											"type": "object"
+										}
+									},
+									"required": [
+										"type"
+									]
+								}
+							},
+							"required": [
+								"name",
+								"description",
+								"inputSchema"
+							]
+						}
+					}
+				},
+				"required": [
+					"qualifiedName",
+					"displayName",
+					"description",
+					"iconUrl",
+					"remote",
+					"deploymentUrl",
+					"connections",
+					"security",
+					"tools"
+				]
+			},
+			"ConfigResponse": {
+				"type": "object",
+				"properties": {
+					"success": {
+						"type": "boolean",
+						"example": true
+					},
+					"result": {
+						"type": "object",
+						"properties": {
+							"command": {
+								"type": "string",
+								"example": "npx"
+							},
+							"args": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								},
+								"example": [
+									"@smithery/hello-world",
+									"--config",
+									"{}"
+								]
+							},
+							"env": {
+								"type": "object",
+								"additionalProperties": {
+									"type": "string"
+								},
+								"example": {
+									"NODE_ENV": "production"
+								}
+							}
+						},
+						"required": [
+							"command",
+							"args"
+						]
+					}
+				},
+				"required": [
+					"success",
+					"result"
+				]
+			},
+			"ConfigRequest": {
+				"type": "object",
+				"properties": {
+					"userId": {
+						"type": "string",
+						"description": "User performing the request"
+					},
+					"connectionType": {
+						"type": "string",
+						"enum": [
+							"stdio"
+						],
+						"description": "The type of server to instantiate",
+						"example": "stdio"
+					},
+					"config": {
+						"type": "object",
+						"additionalProperties": {},
+						"description": "The configuration for the server",
+						"example": {
+							"host": "localhost",
+							"port": 8080
+						}
+					}
+				},
+				"required": [
+					"connectionType",
+					"config"
+				]
+			},
+			"UplinkTokenResponse": {
+				"type": "object",
+				"properties": {
+					"authtoken": {
+						"type": "string",
+						"example": "2abcdefg_1a2b3c4d5e6f7g8h9i0j"
+					},
+					"domain": {
+						"type": "string",
+						"example": "ngrok.smithery.ai"
+					}
+				},
+				"required": [
+					"authtoken",
+					"domain"
+				]
+			},
+			"UplinkError": {
+				"type": "object",
+				"properties": {
+					"error": {
+						"type": "string",
+						"example": "Failed to create tunnel token"
+					}
+				},
+				"required": [
+					"error"
+				]
+			}
+		}
+	},
+	"security": [
+		{
+			"bearerAuth": []
+		}
+	],
+	"paths": {
+		"/servers": {
+			"get": {
+				"responses": {
+					"200": {
+						"description": "Successful response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ServersListResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad request",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Error"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Unauthorized",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Error"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Unprocessable entity",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Error"
+								}
+							}
+						}
+					}
+				},
+				"operationId": "getServers",
+				"tags": [
+					"servers"
+				],
+				"parameters": [
+					{
+						"name": "q",
+						"in": "query",
+						"description": "Search query. We use semantic search, so treat this as a prompt. You can use special filters:\n\n*   **Text Search:** Simply type any text to search semantically (e.g., `machine learning`).\n*   **Owner Filter:** Use `owner:username` to filter by repository owner (e.g., `owner:smithery-ai`).\n*   **Repository Filter:** Use `repo:repository-name` to filter by repository name (e.g., `repo:fetch`).\n*   **Deployment Status:** Use `is:deployed` to show only deployed servers.\n*   **Verification Status:** Use `is:verified` to show only verified servers.\n\nYou can combine multiple filters. For example: `owner:mem0ai is:verified memory`.",
+						"required": false,
+						"schema": {
+							"type": "string",
+							"example": "owner:mem0ai is:verified memory"
+						}
+					},
+					{
+						"name": "page",
+						"in": "query",
+						"description": "Page number for pagination (default: 1)",
+						"required": false,
+						"schema": {
+							"type": "string",
+							"example": "1"
+						}
+					},
+					{
+						"name": "pageSize",
+						"in": "query",
+						"description": "Number of items per page (default: 10)",
+						"required": false,
+						"schema": {
+							"type": "string",
+							"example": "10"
+						}
+					},
+					{
+						"name": "profile",
+						"in": "query",
+						"description": "Smithery profile to filter by",
+						"required": false,
+						"schema": {
+							"type": "string",
+							"example": "personal"
+						}
+					}
+				],
+				"summary": "List/Search servers",
+				"description": "Get a paginated list of all servers",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				]
+			}
+		},
+		"/servers/{id}": {
+			"get": {
+				"responses": {
+					"200": {
+						"description": "Server found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Server"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Server not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Error"
+								}
+							}
+						}
+					},
+					"500": {
+						"description": "Internal server error",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Error"
+								}
+							}
+						}
+					}
+				},
+				"operationId": "getServersById",
+				"tags": [
+					"servers"
+				],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"description": "The qualified name or ID of the server",
+						"required": true,
+						"schema": {
+							"type": "string",
+							"example": "smithery/hello-world"
+						}
+					}
+				],
+				"summary": "Get a server by ID",
+				"description": "Get a single server by its qualified name or ID"
+			}
+		}
+	}
+}

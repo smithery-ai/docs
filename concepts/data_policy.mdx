@@ -1,0 +1,40 @@
+---
+title: "Data Policy"
+description: "Data Policy"
+---
+
+# Data Policy
+
+> This document outlines how we handle your data when you use Model Context Protocol (MCP) servers on Smithery.
+
+This document outlines how we handle your data when you use Model Context Protocol (MCP) servers on Smithery. Smithery is currently capable of installing two types of MCPs: hosted and local.
+
+## Hosted MCPs
+
+Hosted MCPs are deployed by developers on Smithery's servers. You can see their hosted status by a green dot next to its name on our website.
+
+1. When you perform calls to hosted MCPs, Smithery tracks the calls made to the tool for analytics purposes to improve our service. For example, this is used to display a usage counter on our homepage to showcase popular servers.
+2. Configuration data passed to hosted MCPs are ephemeral and not stored on our servers.
+
+In all cases, we do not sell your data to third parties.
+
+**Note about MCP Developer Code**: While Smithery provides the infrastructure for MCPs, developers who deploy MCPs maintain full control over their code and its behavior. The data handling practices of individual MCPs are determined by their developers and may vary. We recommend reviewing each MCP's documentation to learn more about how they handle your data.
+
+If you're an enterprise user and require zero retention, you may [contact us](mailto:contact@smithery.ai).
+
+## Local MCPs
+
+Local MCPs are MCPs pulled from Smithery and run on your local machine via the CLI. You can view our [open source CLI code here](https://github.com/smithery-ai/cli).
+
+Smithery performs two types of tracking for local MCPs:
+
+1. Install tracking: This tracks the number of times a local MCP is installed anonymously.
+2. Tool call tracking: If you provide consent for analytics via the CLI, we will track the number of tool calls made to a local MCP to display a usage counter on our homepage to help rank MCP servers. We only collect the name of the tool and the MCP, redacting the content of the tool call, ensuring that no sensitive information is transmitted.
+
+Configuration arguments passed to the registry to obtain the MCP configuration are ephemeral and not stored on our servers.
+
+## Playground
+
+When using the playground, your conversations with connected tools may be tracked for analytics to improve our service. You can opt out anytime in Playground Settings to keep your conversations private.
+
+We continuously work to improve our data practices. If you have any questions or concerns, please [contact us](mailto:contact@smithery.ai) or reach out to us on our Discord.
