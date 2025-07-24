@@ -16,17 +16,17 @@
       {
         "group": "Getting Started",
         "pages": [
-          "index"
+          "index",
+          "getting_started/quickstart_connect",
+          "getting_started/quickstart_build"
         ]
       },
       {
         "group": "Use MCP Servers",
         "pages": [
           "use/index",
-          "use/registry",
           "use/connect",
           "use/profiles",
-          "use/data-policy",
           "use/deep-linking"
         ]
       },
@@ -47,8 +47,11 @@
           },
           "build/permissions"
         ]
+      },
+      {
+        "group": "API Reference",
+        "openapi": "openapi.json"
       }
-      
     ]
   },
   "icons": {
@@ -83,11 +86,16 @@
     }
   },
   "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude"
-    ]
-  }
+    "options": ["copy", "view", "chatgpt", "claude"]
+  },
+  "redirects": [
+    {
+      "source": "/use/registry",
+      "destination": "/api-reference/servers/listsearch-servers"
+    },
+    {
+      "source": "/build/getting-started",
+      "destination": "/getting_started/quickstart_build"
+    }
+  ]
 }

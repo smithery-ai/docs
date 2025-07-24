@@ -1,0 +1,140 @@
+---
+title: "Quickstart: Build an MCP server"
+description: "Build and run a Streamable HTTP MCP server in TypeScript with two lines of code"
+---
+
+The easiest way to build an MCP server is to use the TypeScript MCP SDK with the Smithery CLI. For other languages like Python, you can use the [FastMCP](https://github.com/jlowin/fastmcp) library with a valid Dockerfile.
+
+### Prerequisites
+
+- Node.js >18 and npm
+- A [Smithery API key](https://smithery.ai) for development features
+
+### 1. Initialize Project
+
+```bash
+npm create smithery
+```
+
+### 2. Edit Your Server
+
+In `src/index.ts`, you'll see a default server that says hello to a given name. Edit it to add your own tools. For more information on the MCP spec, check out the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk?tab=readme-ov-file#quick-start).
+
+Or, you can invoke this server by prompting something like "Say hello to Henry".
+
+```typescript
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+
+// Optional: Define configuration schema to require configuration at connection time
+// export const configSchema = z.object({
+//   debug: z.boolean().default(false).describe("Enable debug logging")
+// });
+
+export default function ({ config }: { config: z.infer<typeof configSchema> }) {
+  // Create a new MCP server per MCP spec
+  const server = new McpServer({
+    name: "My MCP Server",
+    version: "1.0.0",
+  });
+
+  // Add a tool
+  server.tool(
+    "hello",
+    "Say hello to someone",
+    {
+      name: z.string().describe("Name to greet"),
+    },
+    async ({ name }) => {
+      return {
+        content: [{ type: "text", text: `Hello, ${name}!` }],
+      };
+    }
+  );
+
+  return server.server;
+}
+```
+
+<Expandable title="Configuration Schema">
+### Configuration Schema
+
+MCP servers can accept [session configurations](/build/session-config) to customize their behavior for each client session. This allows users to provide API keys, adjust settings, or modify how your server operates when they connect.
+
+Export a `configSchema` using Zod to define what configuration your server accepts:
+
+```typescript
+export const configSchema = z.object({
+  myApiKey: z.string().describe("Required API key"),
+  options: z
+    .object({
+      timeout: z.number().default(5000),
+      retries: z.number().default(3),
+    })
+    .optional(),
+});
+```
+
+Benefits:
+
+- **Type safety**: Use `z.infer<typeof configSchema>` for TypeScript types
+- **Runtime validation**: Automatically validate configuration at connection time
+- **Auto-generated UI**: Smithery creates configuration forms based on your schema
+- **Documentation**: Schema descriptions become help text for users
+
+</Expandable>
+
+### 3. Start Development Server
+
+```bash
+npm run dev
+```
+
+This will port-forward your local server to the Smithery Playground via ngrok. You can also reference the [Smithery CLI](https://github.com/smithery-ai/cli) for more controls.
+
+### 4. Deploy
+
+![Deployment](../images/deploy.png)
+
+Deployment is a one-click process. Just [make a GitHub repo](https://github.com/new) and [click "Deploy" on the Smithery home page](https://smithery.ai/new).
+
+## Advanced: Build Configuration
+
+For advanced use cases, you can customize the build process using a `smithery.config.js` file. This is useful for:
+
+- Marking packages as external (to avoid bundling issues)
+- Configuring minification, targets, and other build options
+- Adding custom esbuild plugins
+
+### Configuration File
+
+Create `smithery.config.js` in your project root:
+
+```javascript
+export default {
+  esbuild: {
+    // Mark problematic packages as external
+    external: ["playwright-core", "puppeteer-core"],
+
+    // Enable minification for production
+    minify: true,
+
+    // Set Node.js target version
+    target: "node18",
+  },
+};
+```
+
+### Common Use Cases
+
+**External Dependencies**: If you encounter bundling issues with packages like Playwright or native modules:
+
+```javascript
+export default {
+  esbuild: {
+    external: ["playwright-core", "sharp", "@grpc/grpc-js"],
+  },
+};
+```
+
+Configuration applies to both `build` and `dev` commands.
