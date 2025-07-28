@@ -1,101 +1,119 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "theme": "maple",
-  "name": "Smithery Documentation",
-  "colors": {
-    "primary": "#EA580C",
-    "light": "#F97316",
-    "dark": "#C2410C"
-  },
-  "modeToggle": {
-    "default": "dark"
-  },
-  "favicon": "/logo/logo.svg",
-  "navigation": {
-    "groups": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "getting_started/quickstart_connect",
-          "getting_started/quickstart_build"
-        ]
-      },
-      {
-        "group": "Use MCP Servers",
-        "pages": [
-          "use/index",
-          "use/connect",
-          "use/profiles",
-          "use/deep-linking"
-        ]
-      },
-      {
-        "group": "Build MCP Servers",
-        "pages": [
-          "build/index",
-          "build/getting-started",
-          "build/deployments",
-          "build/session-config",
-          {
-            "group": "Project Configuration",
-            "pages": [
-              "build/project-config/index",
-              "build/project-config/dockerfile",
-              "build/project-config/smithery-yaml"
-            ]
-          },
-          "build/permissions"
-        ]
-      },
-      {
-        "group": "API Reference",
-        "openapi": "openapi.json"
-      }
-    ]
-  },
-  "icons": {
-    "library": "lucide"
-  },
-  "fonts": {
-    "family": "Geist"
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg",
-    "href": "https://smithery.ai"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:support@smithery.ai"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Discord",
-      "href": "https://discord.gg/Afd38S5p9A"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/smithery-ai",
-      "twitter": "https://twitter.com/SmitheryDotAI",
-      "discord": "https://discord.gg/Afd38S5p9A"
-    }
-  },
-  "contextual": {
-    "options": ["copy", "view", "chatgpt", "claude"]
-  },
-  "redirects": [
-    {
-      "source": "/use/registry",
-      "destination": "/api-reference/servers/listsearch-servers"
-    },
-    {
-      "source": "/build/getting-started",
-      "destination": "/getting_started/quickstart_build"
-    }
-  ]
+	"$schema": "https://mintlify.com/docs.json",
+	"theme": "maple",
+	"name": "Smithery Documentation",
+	"colors": {
+		"primary": "#EA580C",
+		"light": "#F97316",
+		"dark": "#C2410C"
+	},
+	"modeToggle": {
+		"default": "dark"
+	},
+	"favicon": "/logo/logo.svg",
+	"navigation": {
+		"groups": [
+			{
+				"group": "Getting Started",
+				"pages": [
+					"index",
+					"getting_started/quickstart_connect",
+					"getting_started/quickstart_build"
+				]
+			},
+			{
+				"group": "Concepts",
+				"pages": [
+					"concepts/what_is_mcp",
+					"concepts/transports"
+				]
+			},
+			{
+				"group": "Cookbooks",
+				"pages": [
+					"cookbooks/typescript_oauth_client"
+				]
+			},
+			{
+				"group": "Use MCP Servers",
+				"pages": [
+					"use/index",
+					"use/connect",
+					"use/profiles",
+					"use/deep-linking"
+				]
+			},
+			{
+				"group": "Build MCP Servers",
+				"pages": [
+					"build/index",
+					"build/getting-started",
+					"build/deployments",
+					"build/session-config",
+					{
+						"group": "Project Configuration",
+						"pages": [
+							"build/project-config/index",
+							"build/project-config/dockerfile",
+							"build/project-config/smithery-yaml"
+						]
+					},
+					"build/permissions"
+				]
+			},
+			{
+				"group": "API Reference",
+				"openapi": "openapi.json"
+			}
+		]
+	},
+	"icons": {
+		"library": "lucide"
+	},
+	"fonts": {
+		"family": "Geist"
+	},
+	"logo": {
+		"light": "/logo/light.svg",
+		"dark": "/logo/dark.svg",
+		"href": "https://smithery.ai"
+	},
+	"navbar": {
+		"links": [
+			{
+				"label": "Support",
+				"href": "mailto:support@smithery.ai"
+			}
+		],
+		"primary": {
+			"type": "button",
+			"label": "Discord",
+			"href": "https://discord.gg/Afd38S5p9A"
+		}
+	},
+	"footer": {
+		"socials": {
+			"github": "https://github.com/smithery-ai",
+			"twitter": "https://twitter.com/SmitheryDotAI",
+			"discord": "https://discord.gg/Afd38S5p9A"
+		}
+	},
+	"contextual": {
+		"options": [
+			"copy",
+			"view",
+			"chatgpt",
+			"claude"
+		]
+	},
+	"redirects": [
+		{
+			"source": "/use/registry",
+			"destination": "/api-reference/servers/listsearch-servers"
+		},
+		{
+			"source": "/build/getting-started",
+			"destination": "/getting_started/quickstart_build"
+		}
+	]
 }
