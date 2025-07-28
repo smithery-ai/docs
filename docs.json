@@ -25,7 +25,10 @@
 				"group": "Concepts",
 				"pages": [
 					"concepts/what_is_mcp",
-					"concepts/transports"
+					"concepts/profiles",
+					"concepts/registry_search_servers",
+					"concepts/registry_get_server",
+					"concepts/cli"
 				]
 			},
 			{

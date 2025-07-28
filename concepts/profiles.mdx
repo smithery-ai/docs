@@ -1,0 +1,26 @@
+---
+title: "Profiles"
+description: "How to use Smithery profiles and the registry API to easily transport your MCP identity between clients"
+---
+
+# Profiles
+
+When you connect to an MCP server through Smithery, we store your identity in a profile. This profile is then used to transport your identity between clients.
+
+Similar to profiles on your browser, you can have a "Personal" profile with connections to Spotify, your personal Notion, etc. and a "Work" profile with connections to your work Notion, your work Slack, Linear, etc.
+
+<Frame>
+  <img src="/images/profile_list.png" alt="Smithery Profiles" />
+</Frame>
+
+You can manage your profiles at [smithery.ai/account/profiles](https://smithery.ai/account/profiles).
+
+Then, when you add a Smithery URL to a client that connects over OAuth, you can select the profile you want to use.
+
+<Frame>
+  <img src="/images/oauth_profile.png" />
+</Frame>
+
+This will then securely transport your Smithery identity to the MCP client you are using, like Cursor or Claude Desktop.
+
+To search for servers in a profile, check out the [page on searching servers with the registry API](/concepts/registry_search_servers).

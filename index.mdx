@@ -11,9 +11,24 @@ You can use Smithery to build, find, and use MCP servers. We host popular MCP se
 - [Context7](https://smithery.ai/server/@upstash/context7-mcp) - Reference the latest docs for most major SDKs and frameworks directly in Cursor or Claude Code
 - [Browserbase](https://smithery.ai/server/@browserbasehq/mcp-browserbase) - Control a remote web browser using [Stagehand](https://stagehand.dev)
 
+<Card
+  title="What is MCP? What does Smithery actually do?"
+  icon="brain"
+  href="/concepts/what_is_mcp"
+>
+  Learn more about MCP and how to use Smithery in our concepts section
+</Card>
+
 You can also build and host your own MCP servers on Smithery, see the quickstarts below!
 
-## Quickstart
+## Quickstarts
+
+<Tip>
+  Install the [Context7 MCP
+  server](https://smithery.ai/server/@upstash/context7-mcp) and use this prompt:
+  ``` /context7 how do I build an MCP server using smithery? ``` ![Context7
+  Smithery Integration](/images/context7-smithery.png)
+</Tip>
 
 <CardGroup>
   <Card
@@ -31,20 +46,3 @@ You can also build and host your own MCP servers on Smithery, see the quickstart
     Create and deploy your own MCP servers to Smithery
   </Card>
 </CardGroup>
-
-<Tip>
-  Install the{" "}
-  <a href="https://smithery.ai/server/@upstash/context7-mcp" target="_blank">
-    Context7 MCP server
-  </a>{" "}
-  and use this prompt: ``` /context7 get docs for smithery/sdk ``` ![Context7
-  Smithery Integration](/images/context7-smithery.png)
-</Tip>
-
-## What is MCP?
-
-The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is an open protocol that enables seamless integration between LLMs and external data sources and tools. It provides a standard way for AI systems to interact with services, eliminating fragmentation across the ecosystem.
-
-By providing a standard way to connect AI systems with data sources, MCP simplifies the development and maintenance of agentic applications. This makes it easier to build agents like intelligent IDEs, chat interfaces and custom AI workflows.
-
-Instead of writing custom implementations for each new data source, developers can use MCP as a single, standardized protocol. This approach not only makes systems more maintainable but also ensures better scalability as your AI applications grow and evolve.

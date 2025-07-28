@@ -1,6 +1,57 @@
 ---
 title: "What is MCP?"
-description: "What is MCP?"
+description: "What is MCP? How does it work? What does Smithery do with MCP?"
 ---
 
-- Local v. Remote, STDIO v. SSE v. SHTTP
+<Frame caption="Source: https://hoangndst.com/blog/model-context-protocol">
+  <img src="/images/mcp.png" alt="MCP Diagram" />
+</Frame>
+
+# What is MCP?
+
+MCP (Model Context Protocol) is an open standard that enables LLMs to access bespoke tools and context, as long as the LLM supports MCP and the tool implements the MCP protocol.
+
+### Use Cases
+
+Broadly speaking, MCP is useful when you want your LLM to get information from the outside world or perform actions on your behalf:
+
+- **Context**: Context is data that can be used by the LLM that may not be available in the LLM's training data. For example, your LLM might want to search the web or access internal company data.
+- **Tools**: Tools are functions that can be called by the LLM. This can be something like "open a pull request from one branch into main" or "send an email to a specific person".
+
+### Servers, Clients, and Transports
+
+MCP, just like HTTP, is a client-server protocol. The **client** is the LLM, and the **server** exposes tools to the LLM. The client and server communicate over a **transport**, which can be fully local or over the internet.
+
+- **Servers** expose tools to a client.
+- **Clients** can call tools on a server.
+- **Transports** are how the client and server communicate with each other. This can be local (STDIO), over the internet (HTTP), or even over a custom transport.
+
+<Card
+  title="Read the official MCP documentation"
+  icon="scroll"
+  href="https://modelcontextprotocol.io/"
+>
+  Learn more about MCP from the Model Context Protocol website
+  (modelcontextprotocol.io)
+</Card>
+
+# What does Smithery do with MCP?
+
+Smithery is a platform that allows you to build MCP servers and clients. We allow users to find the right MCP server for their needs, and we allow developers to build MCP servers to expose to the world.
+
+We have a diverse mix of MCP servers, both local (STDIO) and over the internet (HTTP). Here are some popular ones:
+
+- [Desktop Commander](https://smithery.ai/server/@wonderwhy-er/desktop-commander) (Local, STDIO): Allow apps like Claude Desktop to run terminal commands on your computer.
+- [Exa](https://smithery.ai/server/exa) (Remote, HTTP): Access live web search results. Do Deep Research, get LinkedIn profiles, and more!
+- [Context7](https://smithery.ai/server/@upstash/context7-mcp) (Remote, HTTP): Let your IDE agent like Cursor Composer access documentation for your favorite libraries and SDKs.
+- [Browserbase](https://smithery.ai/server/@browserbasehq/mcp-browserbase) (Remote, HTTP): Use Claude Desktop/Cursor to control a remote web browser.
+
+You can also build and deploy your own MCP servers on Smithery!
+
+<Card
+  title="Build and deploy your own MCP server to Smithery"
+  icon="anvil"
+  href="/getting_started/quickstart_build"
+>
+  Learn how to build and deploy your own MCP server to Smithery
+</Card>
