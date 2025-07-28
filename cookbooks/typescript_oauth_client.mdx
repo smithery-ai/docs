@@ -1,0 +1,1098 @@
+---
+title: "Build an OAuth-compatible client"
+description: "How to build an OAuth client in Typescript using Next.js"
+---
+
+This guide will walk you through the process of building an OAuth-compatible MCP client in Typescript. We'll be using Next.js and the Model Context Protocol SDK.
+It builds off of the [official example from the MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/examples/client/simpleOAuthClient.ts).
+
+<CardGroup>
+  <Card
+    title="Show me the repo"
+    icon="github"
+    href="https://github.com/smithery-ai/smithery-cookbook/tree/main/clients/typescript/simple-oauth"
+  >
+    View the fully runnable GitHub repo for this example
+  </Card>
+  <Card
+    title="Official MCP Docs"
+    icon="scroll"
+    href="https://modelcontextprotocol.io/specification/draft/basic/authorization"
+  >
+    View the official MCP docs for authorization
+  </Card>
+</CardGroup>
+
+## 1. Install dependencies
+
+First, create a new Next.js project and install the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk).
+
+```bash
+npx create-next-app@latest my-mcp-client
+cd my-mcp-client
+npm install @modelcontextprotocol/sdk
+```
+
+## 2. Create Library Files
+
+You'll want to create a `/lib` directory for common code across your application. This will contain the core logic for the MCP client and the authentication flow.
+
+Then, create the following files in your `/lib` directory:
+
+### Session Store
+
+<Warning>
+  This file contains a simple in-memory session store. For production
+  applications, you should use a more robust solution like Redis or a database.
+</Warning>
+
+```typescript /lib/session-store.ts expandable
+import { MCPOAuthClient } from "./oauth-client";
+
+// Simple in-memory session store for demo purposes
+// In production, use Redis, database, or proper session management
+class SessionStore {
+  private clients = new Map<string, MCPOAuthClient>();
+
+  setClient(sessionId: string, client: MCPOAuthClient) {
+    this.clients.set(sessionId, client);
+  }
+
+  getClient(sessionId: string): MCPOAuthClient | null {
+    return this.clients.get(sessionId) || null;
+  }
+
+  removeClient(sessionId: string) {
+    const client = this.clients.get(sessionId);
+    if (client) {
+      client.disconnect();
+      this.clients.delete(sessionId);
+    }
+  }
+
+  generateSessionId(): string {
+    return Math.random().toString(36).substring(2) + Date.now().toString(36);
+  }
+}
+
+export const sessionStore = new SessionStore();
+```
+
+### OAuth Client
+
+This file contains the core logic for the MCP OAuth client.
+
+```typescript /lib/oauth-client.ts expandable
+import { URL } from "node:url";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+  OAuthClientInformation,
+  OAuthClientInformationFull,
+  OAuthClientMetadata,
+  OAuthTokens,
+} from "@modelcontextprotocol/sdk/shared/auth.js";
+import {
+  CallToolRequest,
+  ListToolsRequest,
+  CallToolResultSchema,
+  ListToolsResultSchema,
+  ListToolsResult,
+  CallToolResult,
+} from "@modelcontextprotocol/sdk/types.js";
+import {
+  OAuthClientProvider,
+  UnauthorizedError,
+} from "@modelcontextprotocol/sdk/client/auth.js";
+
+class InMemoryOAuthClientProvider implements OAuthClientProvider {
+  private _clientInformation?: OAuthClientInformationFull;
+  private _tokens?: OAuthTokens;
+  private _codeVerifier?: string;
+
+  constructor(
+    private readonly _redirectUrl: string | URL,
+    private readonly _clientMetadata: OAuthClientMetadata,
+    onRedirect?: (url: URL) => void
+  ) {
+    this._onRedirect =
+      onRedirect ||
+      ((url) => {
+        console.log(`Redirect to: ${url.toString()}`);
+      });
+  }
+
+  private _onRedirect: (url: URL) => void;
+
+  get redirectUrl(): string | URL {
+    return this._redirectUrl;
+  }
+
+  get clientMetadata(): OAuthClientMetadata {
+    return this._clientMetadata;
+  }
+
+  clientInformation(): OAuthClientInformation | undefined {
+    return this._clientInformation;
+  }
+
+  saveClientInformation(clientInformation: OAuthClientInformationFull): void {
+    this._clientInformation = clientInformation;
+  }
+
+  tokens(): OAuthTokens | undefined {
+    return this._tokens;
+  }
+
+  saveTokens(tokens: OAuthTokens): void {
+    this._tokens = tokens;
+  }
+
+  redirectToAuthorization(authorizationUrl: URL): void {
+    this._onRedirect(authorizationUrl);
+  }
+
+  saveCodeVerifier(codeVerifier: string): void {
+    this._codeVerifier = codeVerifier;
+  }
+
+  codeVerifier(): string {
+    if (!this._codeVerifier) {
+      throw new Error("No code verifier saved");
+    }
+    return this._codeVerifier;
+  }
+}
+
+export class MCPOAuthClient {
+  private client: Client | null = null;
+  private oauthProvider: InMemoryOAuthClientProvider | null = null;
+
+  constructor(
+    private serverUrl: string,
+    private callbackUrl: string,
+    private onRedirect: (url: string) => void
+  ) {}
+
+  async connect(): Promise<void> {
+    const clientMetadata: OAuthClientMetadata = {
+      client_name: "Next.js MCP OAuth Client",
+      redirect_uris: [this.callbackUrl],
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "client_secret_post",
+      scope: "mcp:tools",
+    };
+
+    this.oauthProvider = new InMemoryOAuthClientProvider(
+      this.callbackUrl,
+      clientMetadata,
+      (redirectUrl: URL) => {
+        this.onRedirect(redirectUrl.toString());
+      }
+    );
+
+    this.client = new Client(
+      {
+        name: "nextjs-oauth-client",
+        version: "1.0.0",
+      },
+      { capabilities: {} }
+    );
+
+    await this.attemptConnection();
+  }
+
+  private async attemptConnection(): Promise<void> {
+    if (!this.client || !this.oauthProvider) {
+      throw new Error("Client not initialized");
+    }
+
+    const baseUrl = new URL(this.serverUrl);
+    const transport = new StreamableHTTPClientTransport(baseUrl, {
+      authProvider: this.oauthProvider,
+    });
+
+    try {
+      await this.client.connect(transport);
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        throw new Error("OAuth authorization required");
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  async finishAuth(authCode: string): Promise<void> {
+    if (!this.client || !this.oauthProvider) {
+      throw new Error("Client not initialized");
+    }
+
+    const baseUrl = new URL(this.serverUrl);
+    const transport = new StreamableHTTPClientTransport(baseUrl, {
+      authProvider: this.oauthProvider,
+    });
+
+    await transport.finishAuth(authCode);
+    await this.client.connect(transport);
+  }
+
+  async listTools(): Promise<ListToolsResult> {
+    if (!this.client) {
+      throw new Error("Not connected to server");
+    }
+
+    const request: ListToolsRequest = {
+      method: "tools/list",
+      params: {},
+    };
+
+    return await this.client.request(request, ListToolsResultSchema);
+  }
+
+  async callTool(
+    toolName: string,
+    toolArgs: Record<string, unknown>
+  ): Promise<CallToolResult> {
+    if (!this.client) {
+      throw new Error("Not connected to server");
+    }
+
+    const request: CallToolRequest = {
+      method: "tools/call",
+      params: {
+        name: toolName,
+        arguments: toolArgs,
+      },
+    };
+
+    return await this.client.request(request, CallToolResultSchema);
+  }
+
+  disconnect(): void {
+    this.client = null;
+    this.oauthProvider = null;
+  }
+}
+```
+
+## 3. Create OAuth API Routes
+
+Next, you'll want to create a few API routes to handle the OAuth flow.
+
+Create the following API routes in a directory at `/app/api/mcp`:
+
+- `/app/api/mcp/auth/connect` - Initiates the connection to the MCP server.
+- `/app/api/mcp/auth/callback` - Handles the OAuth callback from the MCP server.
+- `/app/api/mcp/auth/finish` - Finalizes the OAuth flow and stores the tokens.
+- `/app/api/mcp/auth/disconnect` - Disconnects from the MCP server.
+
+### Initialize the OAuth flow
+
+This endpoint initiates the connection to the MCP server.
+
+```typescript /app/api/mcp/auth/connect/route.ts expandable
+import { NextRequest, NextResponse } from "next/server";
+import { MCPOAuthClient } from "@/lib/oauth-client";
+import { sessionStore } from "@/lib/session-store";
+
+interface ConnectRequestBody {
+  serverUrl: string;
+  callbackUrl: string;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body: ConnectRequestBody = await request.json();
+    const { serverUrl, callbackUrl } = body;
+
+    if (!serverUrl || !callbackUrl) {
+      return NextResponse.json(
+        { error: "Server URL and callback URL are required" },
+        { status: 400 }
+      );
+    }
+
+    const sessionId = sessionStore.generateSessionId();
+    let authUrl: string | null = null;
+
+    const client = new MCPOAuthClient(
+      serverUrl,
+      callbackUrl,
+      (redirectUrl: string) => {
+        authUrl = redirectUrl;
+      }
+    );
+
+    try {
+      await client.connect();
+      // If we get here, connection succeeded without OAuth
+      sessionStore.setClient(sessionId, client);
+      return NextResponse.json({ success: true, sessionId });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.message === "OAuth authorization required" && authUrl) {
+          // Store client for later use
+          sessionStore.setClient(sessionId, client);
+          return NextResponse.json(
+            { requiresAuth: true, authUrl, sessionId },
+            { status: 401 }
+          );
+        } else {
+          return NextResponse.json(
+            { error: error.message || "Unknown error" },
+            { status: 500 }
+          );
+        }
+      }
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+```
+
+### Handle the OAuth callback
+
+This is the OAuth callback endpoint.
+
+```typescript /app/api/mcp/auth/callback/route.ts expandable
+import { NextRequest, NextResponse } from "next/server";
+
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const code = searchParams.get("code");
+  const error = searchParams.get("error");
+
+  if (code) {
+    const html = `
+      <html>
+        <body>
+          <h1>Authorization Successful!</h1>
+          <p>You can close this window and return to the app.</p>
+          <script>
+            // Send the auth code to the parent window
+            if (window.opener) {
+              window.opener.postMessage({ type: 'oauth-success', code: '${code}' }, '*');
+              window.close();
+            } else {
+              // Fallback: redirect to main app with code
+              window.location.href = '/?code=${code}';
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    return new NextResponse(html, {
+      headers: { "Content-Type": "text/html" },
+    });
+  } else if (error) {
+    const html = `
+      <html>
+        <body>
+          <h1>Authorization Failed</h1>
+          <p>Error: ${error}</p>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ type: 'oauth-error', error: '${error}' }, '*');
+              window.close();
+            } else {
+              // Fallback: redirect to main app with error
+              window.location.href = '/?error=${error}';
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    return new NextResponse(html, {
+      headers: { "Content-Type": "text/html" },
+    });
+  }
+
+  return new NextResponse("Bad request", { status: 400 });
+}
+```
+
+### Finalize the OAuth flow
+
+This endpoint finalizes the OAuth flow.
+
+```typescript /app/api/mcp/auth/finish/route.ts expandable
+import { NextRequest, NextResponse } from "next/server";
+import { sessionStore } from "@/lib/session-store";
+
+interface FinishAuthRequestBody {
+  authCode: string;
+  sessionId: string;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body: FinishAuthRequestBody = await request.json();
+    const { authCode, sessionId } = body;
+
+    if (!authCode || !sessionId) {
+      return NextResponse.json(
+        { error: "Authorization code and session ID are required" },
+        { status: 400 }
+      );
+    }
+
+    const client = sessionStore.getClient(sessionId);
+
+    if (!client) {
+      return NextResponse.json(
+        { error: "No active OAuth session found" },
+        { status: 400 }
+      );
+    }
+
+    await client.finishAuth(authCode);
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+```
+
+### Disconnect from the MCP server
+
+This endpoint disconnects from the MCP server.
+
+```typescript /app/api/mcp/auth/disconnect/route.ts expandable
+import { NextRequest, NextResponse } from "next/server";
+import { sessionStore } from "@/lib/session-store";
+
+interface DisconnectRequestBody {
+  sessionId: string;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body: DisconnectRequestBody = await request.json();
+    const { sessionId } = body;
+
+    if (!sessionId) {
+      return NextResponse.json(
+        { error: "Session ID is required" },
+        { status: 400 }
+      );
+    }
+
+    sessionStore.removeClient(sessionId);
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+```
+
+## 4. List/Call Tools
+
+Next, you'll want to create a few API routes to handle actually using the tools provided by the MCP server. Create the following API routes in a directory at `/app/api/mcp`:
+
+- `/app/api/mcp/tool/list` - Lists the available tools on the MCP server.
+- `/app/api/mcp/tool/call` - Calls a tool on the MCP server.
+
+### List the available tools
+
+This endpoint lists the available tools on the MCP server.
+
+```typescript /app/api/mcp/tool/list/route.ts expandable
+import { NextRequest, NextResponse } from "next/server";
+import { sessionStore } from "@/lib/session-store";
+
+export async function GET(request: NextRequest) {
+  try {
+    const sessionId = request.nextUrl.searchParams.get("sessionId");
+
+    if (!sessionId) {
+      return NextResponse.json(
+        { error: "Session ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const client = sessionStore.getClient(sessionId);
+
+    if (!client) {
+      return NextResponse.json(
+        { error: "Not connected to server" },
+        { status: 400 }
+      );
+    }
+
+    const result = await client.listTools();
+
+    return NextResponse.json({ tools: result.tools || [] });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+```
+
+### Call a tool
+
+This endpoint calls a tool on the MCP server.
+
+```typescript /app/api/mcp/tool/call/route.ts expandable
+import { NextRequest, NextResponse } from "next/server";
+import { sessionStore } from "@/lib/session-store";
+
+interface CallToolRequestBody {
+  toolName: string;
+  toolArgs?: Record<string, unknown>;
+  sessionId: string;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body: CallToolRequestBody = await request.json();
+    const { toolName, toolArgs, sessionId } = body;
+
+    if (!toolName || !sessionId) {
+      return NextResponse.json(
+        { error: "Tool name and session ID are required" },
+        { status: 400 }
+      );
+    }
+
+    const client = sessionStore.getClient(sessionId);
+
+    if (!client) {
+      return NextResponse.json(
+        { error: "Not connected to server" },
+        { status: 400 }
+      );
+    }
+
+    const result = await client.callTool(toolName, toolArgs || {});
+
+    return NextResponse.json({ result });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+```
+
+## 5. Build the UI
+
+Now, you'll want to build the UI to call these endpoints. You can use the following code to get started:
+
+```typescript /app/page.tsx expandable
+"use client";
+
+import { useState } from "react";
+
+interface SchemaProperty {
+  type?: string;
+  description?: string;
+  default?: unknown;
+}
+
+interface Tool {
+  name: string;
+  description?: string;
+  inputSchema?: {
+    type: "object";
+    properties?: Record<string, SchemaProperty>;
+    required?: string[];
+  };
+}
+
+export default function Home() {
+  const [serverUrl, setServerUrl] = useState(
+    "https://server.smithery.ai/exa/mcp"
+  );
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [selectedTool, setSelectedTool] = useState("");
+  const [toolArgs, setToolArgs] = useState("{}");
+  const [toolResult, setToolResult] = useState<object | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
+  const generateDefaultArgs = (tool: Tool): string => {
+    if (!tool.inputSchema?.properties) {
+      return "{}";
+    }
+
+    const defaultArgs: Record<string, unknown> = {};
+
+    Object.entries(tool.inputSchema.properties).forEach(([key, schema]) => {
+      switch (schema.type) {
+        case "string":
+          defaultArgs[key] = schema.default || "";
+          break;
+        case "number":
+        case "integer":
+          defaultArgs[key] = schema.default || 0;
+          break;
+        case "boolean":
+          defaultArgs[key] = schema.default || false;
+          break;
+        case "array":
+          defaultArgs[key] = schema.default || [];
+          break;
+        case "object":
+          defaultArgs[key] = schema.default || {};
+          break;
+        default:
+          defaultArgs[key] = schema.default || null;
+      }
+    });
+
+    return JSON.stringify(defaultArgs, null, 2);
+  };
+
+  const handleToolSelect = (toolName: string) => {
+    setSelectedTool(toolName);
+    setJsonError(null);
+
+    if (toolName) {
+      const tool = tools.find((t) => t.name === toolName);
+      if (tool) {
+        setToolArgs(generateDefaultArgs(tool));
+      }
+    } else {
+      setToolArgs("{}");
+    }
+  };
+
+  const handleArgsChange = (value: string) => {
+    setToolArgs(value);
+
+    // Validate JSON syntax
+    try {
+      if (value.trim()) {
+        JSON.parse(value);
+      }
+      setJsonError(null);
+    } catch (e) {
+      setJsonError(e instanceof Error ? e.message : "Invalid JSON");
+    }
+  };
+
+  const getCallbackUrl = () => {
+    return `${window.location.origin}/api/mcp/auth/callback`;
+  };
+
+  const handleConnect = async () => {
+    if (!serverUrl) return;
+
+    setLoading(true);
+    setError(null);
+    setJsonError(null);
+
+    try {
+      const response = await fetch("/api/mcp/auth/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serverUrl, callbackUrl: getCallbackUrl() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.requiresAuth && data.authUrl && data.sessionId) {
+          setSessionId(data.sessionId);
+          // Open authorization URL in a popup
+          const popup = window.open(
+            data.authUrl,
+            "oauth-popup",
+            "width=600,height=700,scrollbars=yes,resizable=yes"
+          );
+
+          // Listen for messages from the popup
+          const messageHandler = async (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+
+            if (event.data.type === "oauth-success") {
+              popup?.close();
+
+              try {
+                const finishResponse = await fetch("/api/mcp/auth/finish", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    authCode: event.data.code,
+                    sessionId: data.sessionId,
+                  }),
+                });
+
+                if (finishResponse.ok) {
+                  setIsConnected(true);
+                  await loadTools(data.sessionId);
+                } else {
+                  const errorData = await finishResponse.json();
+                  setError(
+                    `Failed to complete authentication: ${errorData.error}`
+                  );
+                }
+              } catch (err) {
+                setError(`Failed to complete authentication: ${err}`);
+              }
+
+              window.removeEventListener("message", messageHandler);
+            } else if (event.data.type === "oauth-error") {
+              popup?.close();
+              setError(`OAuth failed: ${event.data.error}`);
+              window.removeEventListener("message", messageHandler);
+            }
+          };
+
+          window.addEventListener("message", messageHandler);
+        } else {
+          setError(data.error || "Connection failed");
+        }
+      } else {
+        setSessionId(data.sessionId);
+        setIsConnected(true);
+        await loadTools(data.sessionId);
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(`Connection failed: ${err.message}`);
+      } else {
+        setError(`Connection failed: ${err}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTools = async (currentSessionId?: string) => {
+    const sid = currentSessionId || sessionId;
+    if (!sid) return;
+
+    try {
+      const response = await fetch(`/api/mcp/tool/list?sessionId=${sid}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setTools(data.tools || []);
+      } else {
+        setError(`Failed to load tools: ${data.error}`);
+      }
+    } catch (err) {
+      setError(`Failed to load tools: ${err}`);
+    }
+  };
+
+  const handleCallTool = async () => {
+    if (!selectedTool) return;
+
+    setLoading(true);
+    setError(null);
+    setToolResult(null);
+
+    try {
+      let args = {};
+      if (toolArgs.trim()) {
+        args = JSON.parse(toolArgs);
+      }
+
+      const response = await fetch("/api/mcp/tool/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          toolName: selectedTool,
+          toolArgs: args,
+          sessionId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setToolResult(data.result);
+      } else {
+        setError(`Tool call failed: ${data.error}`);
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(`Tool call failed: ${err.message}`);
+      } else {
+        setError(`Tool call failed: ${err}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      if (sessionId) {
+        await fetch("/api/mcp/auth/disconnect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+      }
+    } catch {
+      // Ignore disconnect errors
+    }
+
+    setSessionId(null);
+    setIsConnected(false);
+    setTools([]);
+    setSelectedTool("");
+    setToolResult(null);
+    setJsonError(null);
+  };
+
+  return (
+    <div className="font-sans min-h-screen p-8 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold mb-8">MCP OAuth Client</h1>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
+      {!isConnected ? (
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="serverUrl"
+              className="block text-sm font-medium mb-2"
+            >
+              MCP Server URL:
+            </label>
+            <input
+              id="serverUrl"
+              type="text"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              placeholder="http://localhost:3000/mcp"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <button
+            onClick={handleConnect}
+            disabled={!serverUrl || loading}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Connecting..." : "Connect"}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="text-green-600 font-medium">
+              ✅ Connected to {serverUrl}
+            </div>
+            <button
+              onClick={handleDisconnect}
+              className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+            >
+              Disconnect
+            </button>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Call Tool</h2>
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="toolSelect"
+                  className="block text-sm font-medium mb-2"
+                >
+                  Select Tool:
+                </label>
+                <select
+                  id="toolSelect"
+                  value={selectedTool}
+                  onChange={(e) => handleToolSelect(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select a tool...</option>
+                  {tools.map((tool, index) => (
+                    <option key={index} value={tool.name}>
+                      {tool.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedTool &&
+                (() => {
+                  const tool = tools.find((t) => t.name === selectedTool);
+                  return tool?.inputSchema?.properties ? (
+                    <div className="bg-blue-50 p-3 rounded-md">
+                      <h4 className="text-sm font-medium text-blue-800 mb-2">
+                        Expected Parameters:
+                      </h4>
+                      <div className="space-y-1">
+                        {Object.entries(tool.inputSchema.properties).map(
+                          ([key, schema]) => (
+                            <div key={key} className="text-sm">
+                              <span className="font-medium text-blue-700">
+                                {key}
+                              </span>
+                              {tool.inputSchema?.required?.includes(key) && (
+                                <span className="text-red-500 ml-1">*</span>
+                              )}
+                              <span className="text-gray-600 ml-2">
+                                ({schema.type || "any"})
+                              </span>
+                              {schema.description && (
+                                <div className="text-gray-500 ml-4 text-xs">
+                                  {schema.description}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
+              <div>
+                <label
+                  htmlFor="toolArgs"
+                  className="block text-sm font-medium mb-2"
+                >
+                  Arguments (JSON):
+                </label>
+                <textarea
+                  id="toolArgs"
+                  value={toolArgs}
+                  onChange={(e) => handleArgsChange(e.target.value)}
+                  placeholder="{}"
+                  rows={3}
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                    jsonError
+                      ? "border-red-300 focus:ring-red-500"
+                      : "border-gray-300 focus:ring-blue-500"
+                  }`}
+                />
+                {jsonError && (
+                  <div className="mt-1 text-sm text-red-600">{jsonError}</div>
+                )}
+              </div>
+
+              <button
+                onClick={handleCallTool}
+                disabled={!selectedTool || loading || !!jsonError}
+                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? "Calling..." : "Call Tool"}
+              </button>
+            </div>
+          </div>
+
+          {toolResult && (
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Tool Result</h2>
+              <div className="bg-gray-100 p-4 rounded-md">
+                <pre className="whitespace-pre-wrap text-sm">
+                  {JSON.stringify(toolResult, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Available Tools</h2>
+            {tools.length > 0 ? (
+              <div className="space-y-2">
+                {tools.map((tool, index) => (
+                  <div
+                    key={index}
+                    className="p-3 border border-gray-200 rounded-md"
+                  >
+                    <div className="font-medium">{tool.name}</div>
+                    {tool.description && (
+                      <div className="text-sm text-gray-600 mt-1">
+                        {tool.description}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-gray-500">No tools available</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Putting it all together
+
+With these files in place, your Next.js application can now interact with an MCP server.
+
+### Authentication Endpoints
+
+- **Connect:** `POST /api/mcp/auth/connect` with `serverUrl` and `callbackUrl` in the body. The `callbackUrl` should point to `/api/mcp/auth/callback`.
+- **List Tools:** `GET /api/mcp/tool/list?sessionId=<sessionId>`
+- **Call Tool:** `POST /api/mcp/tool/call` with `toolName`, `toolArgs`, and `sessionId` in the body.
+- **Disconnect:** `POST /api/mcp/auth/disconnect` with `sessionId` in the body.
+
+### Tool Endpoints
+
+- **List Tools:** `GET /api/mcp/tool/list?sessionId=<sessionId>`
+- **Call Tool:** `POST /api/mcp/tool/call` with `toolName`, `toolArgs`, and `sessionId` in the body.
+
+Here's what your directory structure should look like:
+
+```
+mcp-oauth-client/
+  |-- next-env.d.ts
+  |-- next.config.ts
+  |-- package-lock.json
+  |-- package.json
+  |-- README.md
+  |-- src/
+  |   |-- app/
+  |   |   |-- api/
+  |   |   |   |-- mcp/
+  |   |   |   |   |-- auth/
+  |   |   |   |   |   |-- callback/
+  |   |   |   |   |   |   |-- route.ts
+  |   |   |   |   |   |-- connect/
+  |   |   |   |   |   |   |-- route.ts
+  |   |   |   |   |   |-- disconnect/
+  |   |   |   |   |   |   |-- route.ts
+  |   |   |   |   |   |-- finish/
+  |   |   |   |   |       |-- route.ts
+  |   |   |   |   |-- tool/
+  |   |   |   |   |   |-- call/
+  |   |   |   |   |   |   |-- route.ts
+  |   |   |   |   |   |-- list/
+  |   |   |   |   |       |-- route.ts
+  |   |   |   |-- page.tsx
+  |   |-- lib/
+  |       |-- oauth-client.ts
+  |       |-- session-store.ts
+  |-- tsconfig.json
+```

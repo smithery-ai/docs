@@ -1,0 +1,124 @@
+---
+title: "Smithery CLI"
+description: "You can use the Smithery CLI to install MCP servers from the registry or debug your MCP servers in the Smithery playground"
+---
+
+<Card
+  title="View the Smithery CLI on GitHub"
+  icon="github"
+  href="https://github.com/smithery-ai/cli"
+>
+  The Smithery CLI is a registry installer and manager for Model Context
+  Protocol (MCP) servers, designed to be client-agnostic.
+</Card>
+
+The Smithery CLI is really helpful for debugging your MCP servers. You can use it to:
+
+- Install MCP servers from the registry
+- Debug your MCP servers in the Smithery playground
+- Build your MCP servers for production
+
+## Examples
+
+```bash
+# Show the help menu
+npx @smithery/cli --help
+
+# Add the exa MCP server to Cursor
+npx -y @smithery/cli@latest install exa --client cursor --profile your-profile-123456 --key $SMITHERY_API_KEY
+
+# Run a local MCP server running on port 3000 in the Smithery playground
+npx @smithery/cli@latest playground --port 3000 --key $SMITHERY_API_KEY
+```
+
+## Reference
+
+```bash
+npx @smithery/cli <command>
+```
+
+### Available Commands
+
+- `install <package>` - Install a package
+  - `--client <name>` - Specify the AI client
+  - `--config <json>` - Provide configuration data as JSON (skips prompts)
+- `uninstall <package>` - Uninstall a package
+  - `--client <name>` - Specify the AI client
+- `inspect <server-id>` - Inspect a server interactively
+- `run <server-id>` - Run a server
+  - `--config <json>` - Provide configuration for the server
+- `list clients` - List available clients
+- `list servers --client <name>` - List installed servers for specific AI client
+- `login` - Login with an API key (interactive)
+- `dev [entryFile]` - Start development server with hot-reload and tunnel
+  - `--port <port>` - Port to run the server on (default: 8181)
+  - `--key <apikey>` - Provide an API key
+  - `--no-open` - Don't automatically open the playground
+  - `--prompt <prompt>` - Initial message to start the playground with
+  - `-c, --config <path>` - Path to config file (default: auto-detect smithery.config.js)
+- `build [entryFile]` - Build MCP server for production
+  - `-o, --out <outfile>` - Output file path (default: .smithery/index.cjs)
+  - `--transport <type>` - Transport type: shttp or stdio (default: shttp)
+  - `-c, --config <path>` - Path to config file (default: auto-detect smithery.config.js)
+- `playground` - Open MCP playground in browser
+  - `--port <port>` - Port to expose (default: 3000)
+  - `--key <apikey>` - Provide an API key
+  - Can pass command after `--` separator
+- `--help` - Show help message
+- `--verbose` - Show detailed logs for debugging
+
+### Examples
+
+```bash
+# Install a server (requires --client flag)
+npx @smithery/cli install mcp-obsidian --client claude
+
+# Install a server with pre-configured data (skips prompts)
+npx @smithery/cli install mcp-obsidian --client claude --config '{"vaultPath":"path/to/vault"}'
+
+# Remove a server
+npx @smithery/cli uninstall mcp-obsidian --client claude
+
+# List available clients
+npx @smithery/cli list clients
+
+# List installed servers for claude
+npx @smithery/cli list servers --client claude
+
+# Inspect a specific server from smithery's registry
+npx @smithery/cli inspect mcp-obsidian
+
+# Run a server with configuration
+npx @smithery/cli run mcp-obsidian --config '{"key":"value"}'
+
+# Login and set API key
+npx @smithery/cli login
+
+# Start development server with hot-reload
+npx @smithery/cli dev
+npx @smithery/cli dev server.ts --port 3000
+
+# Build server for production
+npx @smithery/cli build
+npx @smithery/cli build server.ts --out dist/server.cjs --transport stdio
+
+# Open playground in browser
+npx @smithery/cli playground
+npx @smithery/cli playground --port 3001 -- node dist/server.js
+
+# Show help menu
+npx @smithery/cli --help
+
+# Install with verbose logging for debugging
+npx @smithery/cli install mcp-obsidian --client claude --verbose
+```
+
+### Important Notes
+
+- Use `login` command to set your Smithery API key (required for some operations)
+- Remember to restart your AI client after installing or uninstalling servers
+- Use the `inspect` command for interactive server testing
+- Run without arguments to see the help menu
+- Use `--verbose` flag for detailed logs when troubleshooting
+- The `dev` command provides hot-reload for MCP server development
+- Use `playground` to test your MCP servers in an interactive web interface
