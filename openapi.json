@@ -17,7 +17,7 @@
 				"type": "http",
 				"scheme": "bearer",
 				"bearerFormat": "API Key",
-				"description": "Bearer token authentication using API key"
+				"description": "Your Smithery API key. You can get one at https://smithery.ai/account/api-keys"
 			}
 		},
 		"schemas": {
