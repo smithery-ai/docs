@@ -26,8 +26,13 @@
 				"pages": [
 					"concepts/what_is_mcp",
 					"concepts/profiles",
-					"concepts/registry_search_servers",
-					"concepts/registry_get_server",
+					{
+						"group": "Registry API",
+						"pages": [
+							"concepts/registry_search_servers",
+							"concepts/registry_get_server"
+						]
+					},
 					"concepts/cli"
 				]
 			},
@@ -42,7 +47,6 @@
 				"pages": [
 					"use/index",
 					"use/connect",
-					"use/profiles",
 					"use/deep-linking"
 				]
 			},
