@@ -1,0 +1,181 @@
+---
+title: "createTransport"
+description: "Create HTTP transports for MCP client connections"
+---
+
+The `createTransport` function creates an HTTP transport for connecting MCP clients to Smithery servers.
+
+## Function Signature
+
+```typescript
+function createTransport(
+  baseUrl: string, 
+  options?: SmitheryUrlOptions
+): StreamableHTTPClientTransport
+```
+
+## Parameters
+
+### `baseUrl`
+- **Type**: `string`
+- **Required**: Yes
+- **Description**: Fully qualified URL to the Smithery server
+- **Example**: `"https://my-server.smithery.ai"` or `"http://localhost:3000"`
+
+### `options`
+- **Type**: `SmitheryUrlOptions`
+- **Required**: No
+- **Description**: Configuration options for the connection
+
+```typescript
+interface SmitheryUrlOptions {
+  // Smithery API key for authentication
+  apiKey?: string
+  
+  // Profile name for saved configurations
+  profile?: string
+  
+  // Configuration object (overrides profile if provided)
+  config?: object
+}
+```
+
+## Return Value
+
+Returns a `StreamableHTTPClientTransport` instance from the MCP SDK that can be passed to `client.connect()`.
+
+## Examples
+
+### Basic Usage
+
+```typescript
+import { createTransport } from "@smithery/sdk"
+
+// Local development server
+const transport = createTransport("http://localhost:3000")
+
+// Production Smithery server
+const transport = createTransport("https://my-server.smithery.ai")
+```
+
+### With API Key
+
+```typescript
+const transport = createTransport("https://my-server.smithery.ai", {
+  apiKey: process.env.SMITHERY_API_KEY
+})
+```
+
+### With Configuration
+
+```typescript
+const transport = createTransport("https://my-server.smithery.ai", {
+  config: {
+    model: "gpt-4",
+    temperature: 0.7,
+    maxTokens: 1000,
+    apiKey: process.env.EXTERNAL_API_KEY
+  }
+})
+```
+
+### Using Saved Profile
+
+```typescript
+// Use a configuration saved in your Smithery account
+const transport = createTransport("https://my-server.smithery.ai", {
+  profile: "production-config"
+})
+```
+
+### Full Client Example
+
+```typescript
+import { createTransport } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+
+async function connectToServer() {
+  // Create transport with options
+  const transport = createTransport("weather-api.smithery.ai", {
+    apiKey: process.env.SMITHERY_API_KEY,
+    config: {
+      units: "metric",
+      language: "en"
+    }
+  })
+
+  // Create and connect client
+  const client = new Client({
+    name: "weather-client",
+    version: "1.0.0"
+  }, {
+    capabilities: {}
+  })
+
+  try {
+    await client.connect(transport)
+    console.log("Connected successfully!")
+    
+    // Use the client
+    const weather = await client.callTool({ 
+      name: "get_weather",
+      arguments: { city: "San Francisco" }
+    })
+    console.log(weather)
+  } finally {
+    await client.close()
+  }
+}
+```
+
+## URL Format
+
+The transport constructs the MCP endpoint URL:
+
+```
+{baseUrl}/mcp?config={base64_encoded_config}&api_key={api_key}&profile={profile}
+```
+
+- Configuration is base64-encoded for URL safety
+- Parameters are properly escaped
+Note: Protocol is not inferred; pass `http://` or `https://` explicitly.
+
+## Error Handling
+
+The transport will throw errors for:
+
+```typescript
+try {
+  const transport = createTransport("invalid-server.smithery.ai", {
+    apiKey: "invalid-key"
+  })
+  await client.connect(transport)
+} catch (error) {
+  if (error.message.includes("UNAUTHORIZED")) {
+    console.error("Invalid API key")
+  } else if (error.message.includes("ECONNREFUSED")) {
+    console.error("Server is not running")
+  } else if (error.message.includes("404")) {
+    console.error("Server not found on Smithery")
+  }
+}
+```
+
+## Security Considerations
+
+1. **Never hardcode API keys** - Use environment variables
+2. **Use HTTPS in production** - Smithery servers use HTTPS by default
+3. **Validate server certificates** - The transport validates SSL certificates
+4. **Rotate API keys regularly** - Update keys through Smithery dashboard
+
+## Performance Tips
+
+1. **Reuse transports** - Create once and reuse for multiple connections
+2. **Connection pooling** - The transport maintains HTTP keep-alive
+3. **Set appropriate timeouts** - Configure based on expected operation duration
+4. **Monitor connection health** - Implement reconnection logic for long-running clients
+
+## Related
+
+- [createSmitheryUrl](/sdk/client/connections) - Lower-level URL construction
+- [Client connections guide](/sdk/client/connections) - Connection patterns and best practices

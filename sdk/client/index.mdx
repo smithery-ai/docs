@@ -1,0 +1,177 @@
+---
+title: "Client SDK"
+description: "Build MCP clients to connect to Smithery servers"
+---
+
+The Smithery SDK provides utilities to simplify creating MCP clients that connect to servers hosted on Smithery or running locally.
+
+## Installation
+
+```bash
+npm install @smithery/sdk @modelcontextprotocol/sdk
+```
+
+## Overview
+
+MCP clients connect to servers to:
+- Discover available tools and resources
+- Execute tools with parameters
+- Subscribe to server notifications
+- Manage persistent connections
+
+## Key Components
+
+<CardGroup>
+  <Card
+    title="Transport"
+    icon="plug"
+    href="/sdk/client/transport"
+  >
+    HTTP transport creation and management
+  </Card>
+  <Card
+    title="Connections"
+    icon="link"
+    href="/sdk/client/connections"
+  >
+    Connection patterns and URL formatting
+  </Card>
+</CardGroup>
+
+## Basic Client Example
+
+```typescript
+import { createTransport } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+// For TypeScript type imports:
+import type { CallToolResult, ListToolsResult } from "@modelcontextprotocol/sdk/types.js"
+
+// Create transport
+const transport = createTransport("https://my-server.smithery.ai")
+
+// Initialize client
+const client = new Client({
+  name: "my-client",
+  version: "1.0.0"
+}, {
+  capabilities: {
+    tools: {},
+    resources: {}
+  }
+})
+
+// Connect and use
+await client.connect(transport)
+const tools = await client.listTools()
+```
+
+## Authentication
+
+Smithery supports multiple authentication methods:
+
+### API Key Authentication
+
+```typescript
+const transport = createTransport("https://server.smithery.ai", {
+  apiKey: process.env.SMITHERY_API_KEY
+})
+```
+
+### Profile-based Authentication
+
+```typescript
+const transport = createTransport("https://server.smithery.ai", {
+  profile: "my-saved-profile"
+})
+```
+
+### Custom Configuration
+
+```typescript
+const transport = createTransport("https://server.smithery.ai", {
+  config: {
+    apiKey: "external-api-key",
+    model: "gpt-4",
+    temperature: 0.7
+  }
+})
+```
+
+## Error Handling
+
+Always wrap client operations in try-catch blocks:
+
+```typescript
+try {
+  await client.connect(transport)
+  const result = await client.callTool({ name: "myTool", arguments: { param: "value" } })
+} catch (error) {
+  if (error.code === "UNAUTHORIZED") {
+    console.error("Invalid API key")
+  } else if (error.code === "TOOL_NOT_FOUND") {
+    console.error("Tool doesn't exist")
+  } else {
+    console.error("Unexpected error:", error)
+  }
+} finally {
+  await client.close()
+}
+```
+
+## Best Practices
+
+1. **Always close connections**: Use try-finally to ensure cleanup
+2. **Handle reconnections**: Implement retry logic for transient failures
+3. **Validate responses**: Check tool results match expected schemas
+4. **Use environment variables**: Never hardcode API keys
+5. **Monitor connection health**: Implement heartbeat checks for long-running clients
+
+## Advanced Usage
+
+### Tool Discovery and Caching
+
+```typescript
+// Cache tool definitions to avoid repeated calls
+let toolCache = null
+
+async function getTools(client) {
+  if (!toolCache) {
+    toolCache = await client.listTools()
+  }
+  return toolCache
+}
+```
+
+### Streaming Responses
+
+```typescript
+// Handle streaming tool responses
+const stream = await client.callToolStream({ 
+  name: "generate_text",
+  arguments: { prompt: "Write a story" }
+})
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.text)
+}
+```
+
+### Connection Pooling
+
+```typescript
+// Reuse transports for multiple clients
+const transportPool = new Map()
+
+function getTransport(url) {
+  if (!transportPool.has(url)) {
+    transportPool.set(url, createTransport(url))
+  }
+  return transportPool.get(url)
+}
+```
+
+## Next Steps
+
+- Learn about [transport creation](/sdk/client/transport)
+- Understand [connection patterns](/sdk/client/connections)
+- Integrate with [AI SDKs](/sdk/integrations)
