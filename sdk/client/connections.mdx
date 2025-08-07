@@ -1,0 +1,306 @@
+---
+title: "Connection Patterns"
+description: "URL formatting and connection patterns for MCP clients"
+---
+
+Learn how to construct URLs and establish connections to Smithery MCP servers.
+
+## URL Construction
+
+The `createSmitheryUrl` function builds properly formatted URLs for MCP connections:
+
+```typescript
+function createSmitheryUrl(
+  baseUrl: string,
+  options?: SmitheryUrlOptions
+): URL
+```
+
+### Basic URL Format
+
+```typescript
+import { createSmitheryUrl } from "@smithery/sdk"
+
+// Creates: https://server.smithery.ai/mcp
+const url = createSmitheryUrl("https://server.smithery.ai")
+
+// With configuration: https://server.smithery.ai/mcp?config=eyJkZWJ1ZyI6dHJ1ZX0=
+const url = createSmitheryUrl("https://server.smithery.ai", {
+  config: { debug: true }
+})
+```
+
+### URL Parameters
+
+The function automatically handles:
+- **Base64 encoding** of configuration objects
+- **Query parameter** construction
+- **URL escaping** for special characters
+- **Protocol selection** (HTTP/HTTPS)
+
+## Connection Patterns
+
+### 1. Direct Connection
+
+The simplest pattern for connecting to a server:
+
+```typescript
+import { createTransport } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+
+const transport = createTransport("https://my-server.smithery.ai")
+const client = new Client({ name: "my-client", version: "1.0.0" })
+await client.connect(transport)
+```
+
+### 2. Authenticated Connection
+
+For servers requiring authentication:
+
+```typescript
+// API Key authentication
+const transport = createTransport("https://secure-server.smithery.ai", {
+  apiKey: process.env.SMITHERY_API_KEY
+})
+
+// Or with additional config
+const transport = createTransport("https://api-server.smithery.ai", {
+  apiKey: process.env.SMITHERY_API_KEY,
+  config: {
+    externalApiKey: process.env.EXTERNAL_API_KEY,
+    region: "us-west-2"
+  }
+})
+```
+
+### 3. Profile-Based Connection
+
+Use saved configurations from your Smithery account:
+
+```typescript
+// Uses configuration saved as "production" in Smithery
+const transport = createTransport("https://my-server.smithery.ai", {
+  profile: "production"
+})
+
+// Profile with override
+const transport = createTransport("https://my-server.smithery.ai", {
+  profile: "production",
+  config: {
+    debug: true // Override profile setting
+  }
+})
+```
+
+### 4. Connection with Retry
+
+Implement retry logic for resilient connections:
+
+```typescript
+async function connectWithRetry(url: string, maxRetries = 3) {
+  let lastError
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const transport = createTransport(url)
+      const client = new Client({
+        name: "resilient-client",
+        version: "1.0.0"
+      })
+      
+      await client.connect(transport)
+      return client
+    } catch (error) {
+      lastError = error
+      console.log(`Connection attempt ${i + 1} failed, retrying...`)
+      await new Promise(resolve => setTimeout(resolve, 1000 * i))
+    }
+  }
+  
+  throw lastError
+}
+```
+
+### 5. Connection Pool Pattern
+
+Manage multiple server connections efficiently:
+
+```typescript
+class ConnectionPool {
+  private connections = new Map<string, Client>()
+  
+  async getConnection(url: string, options?: SmitheryUrlOptions) {
+const key = `${url}-${JSON.stringify(options || {})}`
+    
+    if (!this.connections.has(key)) {
+      const transport = createTransport(url, options)
+      const client = new Client({
+        name: "pooled-client",
+        version: "1.0.0"
+      })
+      
+      await client.connect(transport)
+      this.connections.set(key, client)
+    }
+    
+    return this.connections.get(key)
+  }
+  
+  async closeAll() {
+    for (const client of this.connections.values()) {
+      await client.close()
+    }
+    this.connections.clear()
+  }
+}
+```
+
+## Configuration Precedence
+
+When multiple configuration sources are provided:
+
+1. **Direct config** object (highest priority)
+2. **Profile** configuration from Smithery
+3. **Server defaults** (lowest priority)
+
+```typescript
+// This config object overrides any profile settings
+const transport = createTransport("server.smithery.ai", {
+  profile: "staging",
+  config: {
+    debug: true,  // Overrides profile's debug setting
+    timeout: 5000 // Overrides profile's timeout
+  }
+})
+```
+
+## Connection Lifecycle
+
+### Proper Connection Management
+
+```typescript
+class ManagedClient {
+  private client: Client
+  private transport: any
+  
+  async connect(url: string, options?: SmitheryUrlOptions) {
+    this.transport = createTransport(url, options)
+    this.client = new Client({
+      name: "managed-client",
+      version: "1.0.0"
+    })
+    
+    await this.client.connect(this.transport)
+    
+    // Set up error handlers
+    this.client.onerror = (error) => {
+      console.error("Client error:", error)
+      this.reconnect()
+    }
+    
+    // Set up notification handlers
+    this.client.setNotificationHandler(ProgressNotificationSchema, (params) => {
+      console.log("Progress:", params.progress)
+    })
+  }
+  
+  async reconnect() {
+    try {
+      await this.client.close()
+    } catch (e) {
+      // Ignore close errors
+    }
+    
+    await this.connect(this.lastUrl, this.lastOptions)
+  }
+  
+  async disconnect() {
+    await this.client.close()
+  }
+}
+```
+
+## Security Best Practices
+
+### 1. Environment Variables
+
+```typescript
+// Good: Use environment variables
+const transport = createTransport("https://server.smithery.ai", {
+  apiKey: process.env.SMITHERY_API_KEY
+})
+
+// Bad: Hardcoded credentials
+const transport = createTransport("https://server.smithery.ai", {
+  apiKey: "sk_live_abc123..." // Never do this!
+})
+```
+
+### 2. Secure Configuration
+
+```typescript
+// Sanitize configuration before sending
+function sanitizeConfig(config: any) {
+  const sanitized = { ...config }
+  
+  // Remove sensitive fields
+  delete sanitized.password
+  delete sanitized.privateKey
+  
+  // Mask API keys
+  if (sanitized.apiKey) {
+    sanitized.apiKey = sanitized.apiKey.substring(0, 8) + "..."
+  }
+  
+  return sanitized
+}
+
+const transport = createTransport("https://server.smithery.ai", {
+  config: sanitizeConfig(userConfig)
+})
+```
+
+### 3. Connection Validation
+
+```typescript
+// Validate server identity
+async function validateServer(client: Client) {
+  const info = await client.getServerInfo()
+  
+  if (info.name !== "expected-server") {
+    throw new Error("Connected to wrong server!")
+  }
+  
+  if (!info.protocolVersion.startsWith("2024")) {
+    throw new Error("Server protocol version too old")
+  }
+}
+```
+
+## Troubleshooting
+
+### Common Connection Issues
+
+1. **CORS Errors** (Browser)
+   - Smithery servers include proper CORS headers
+   - Check if running from `localhost` or HTTPS domain
+
+2. **SSL/TLS Errors**
+   - Smithery servers use valid SSL certificates
+   - For local development, use HTTP: `createTransport("localhost:3000")`
+
+3. **Authentication Failures**
+   - Verify API key is correct
+   - Check key permissions in Smithery dashboard
+   - Ensure key hasn't expired
+
+4. **Timeout Issues**
+   - Default timeout is 30 seconds
+   - Increase for long-running operations
+   - Implement heartbeat for persistent connections
+
+## Related Resources
+
+- [createTransport](/sdk/client/transport) - Transport creation function
+- [Configuration guide](/sdk/configuration) - Server configuration options
+- [Error handling](/sdk/patterns/errors) - Error handling patterns
