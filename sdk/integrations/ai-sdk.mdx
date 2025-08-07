@@ -1,0 +1,422 @@
+---
+title: "Vercel AI SDK Integration"
+description: "Use MCP tools with Vercel AI SDK for AI-powered applications"
+---
+
+The Smithery SDK provides seamless integration with [Vercel AI SDK](https://sdk.vercel.ai/), allowing you to use MCP tools in AI applications with full type safety and automatic updates.
+
+## Functions
+
+### watchTools
+
+Watches for tool changes and maintains an up-to-date tool registry:
+
+```typescript
+function watchTools(client: ToolClient): Promise<Record<string, Tool>>
+```
+
+### listTools
+
+Gets the current list of tools formatted for AI SDK:
+
+```typescript
+function listTools(client: ToolClient): Promise<Record<string, Tool>>
+```
+
+## Basic Setup
+
+```typescript
+import { createTransport, watchTools, wrapError } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
+
+// 1. Connect to MCP server
+const transport = createTransport("https://my-server.smithery.ai")
+const client = wrapError(new Client({
+  name: "ai-app",
+  version: "1.0.0"
+}, {
+  capabilities: {}
+}))
+
+await client.connect(transport)
+
+// 2. Get MCP tools for AI SDK
+const tools = await watchTools(client)
+
+// 3. Use with AI SDK
+const result = await generateText({
+  model: openai("gpt-4"),
+  tools,
+  prompt: "Your prompt here"
+})
+```
+
+## Tool Watching
+
+The `watchTools` function automatically updates when tools change:
+
+```typescript
+// Initial tool setup
+const tools = await watchTools(client)
+console.log("Available tools:", Object.keys(tools))
+
+// Tools automatically update when server changes
+// No need to manually refresh
+
+// Use in your AI application
+async function handleUserQuery(query: string) {
+  return generateText({
+    model: openai("gpt-4"),
+    tools,  // Always up-to-date
+    prompt: query
+  })
+}
+```
+
+## Tool Format
+
+MCP tools are automatically converted to AI SDK format:
+
+```typescript
+// MCP tool definition
+{
+  name: "search_database",
+  description: "Search the customer database",
+  inputSchema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Search query" },
+      limit: { type: "number", description: "Max results" }
+    },
+    required: ["query"]
+  }
+}
+
+// Converted to AI SDK tool
+{
+  description: "Search the customer database",
+  parameters: z.object({
+    query: z.string().describe("Search query"),
+    limit: z.number().describe("Max results").optional()
+  }),
+  execute: async (args) => {
+    // Automatic MCP tool execution
+  }
+}
+```
+
+## Usage Examples
+
+### Chat Application
+
+```typescript
+import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
+
+export async function createAIAssistant(serverUrl: string) {
+  // Setup MCP connection
+  const transport = createTransport(serverUrl)
+  const client = new Client({ name: "assistant", version: "1.0.0" })
+  await client.connect(transport)
+  
+  // Get tools
+  const tools = await watchTools(client)
+  
+  // Chat function
+  return async function chat(messages: any[]) {
+    const response = await generateText({
+      model: openai("gpt-4"),
+      tools,
+      messages,
+      toolChoice: "auto"
+    })
+    
+    return response
+  }
+}
+
+// Usage
+const assistant = await createAIAssistant("assistant.smithery.ai")
+const response = await assistant([
+  { role: "user", content: "What's in the database?" }
+])
+```
+
+### Streaming Responses
+
+```typescript
+import { generateTextStream } from "ai"
+
+const tools = await watchTools(client)
+
+const stream = await generateTextStream({
+  model: openai("gpt-4"),
+  tools,
+  prompt: "Analyze the latest sales data",
+  onToolCall: async ({ toolCall }) => {
+    console.log(`Calling tool: ${toolCall.toolName}`)
+  }
+})
+
+// Stream the response
+for await (const part of stream) {
+  switch (part.type) {
+    case "text-delta":
+      process.stdout.write(part.textDelta)
+      break
+    case "tool-call":
+      console.log("\nTool called:", part.toolName)
+      break
+    case "tool-result":
+      console.log("Tool result:", part.result)
+      break
+  }
+}
+```
+
+### Tool Selection
+
+```typescript
+const tools = await watchTools(client)
+
+// Let model choose tools
+const autoResponse = await generateText({
+  model: openai("gpt-4"),
+  tools,
+  toolChoice: "auto",
+  prompt: "Get weather for NYC"
+})
+
+// Require tool use
+const requiredResponse = await generateText({
+  model: openai("gpt-4"),
+  tools,
+  toolChoice: "required",
+  prompt: "Calculate the fibonacci sequence"
+})
+
+// Specific tool
+const specificResponse = await generateText({
+  model: openai("gpt-4"),
+  tools,
+  toolChoice: { type: "tool", toolName: "calculate" },
+  prompt: "What's 2 + 2?"
+})
+```
+
+## Advanced Patterns
+
+### Tool Filtering
+
+Filter tools before passing to AI:
+
+```typescript
+const allTools = await watchTools(client)
+
+// Filter by capability
+const dataTools = Object.fromEntries(
+  Object.entries(allTools).filter(([name]) => 
+    name.startsWith("data_") || name.includes("query")
+  )
+)
+
+// Filter by description
+const safeTools = Object.fromEntries(
+  Object.entries(allTools).filter(([_, tool]) =>
+    !tool.description.includes("delete") &&
+    !tool.description.includes("drop")
+  )
+)
+```
+
+### Multiple MCP Servers
+
+Combine tools from multiple servers:
+
+```typescript
+// Connect to multiple servers
+async function connectToServers(servers: string[]) {
+  const clients = await Promise.all(
+    servers.map(async (server) => {
+      const transport = createTransport(server)
+      const client = new Client({
+        name: "multi-server-client",
+        version: "1.0.0"
+      })
+      await client.connect(transport)
+      return client
+    })
+  )
+  
+  // Combine tools from all servers
+  const allTools = {}
+  for (const client of clients) {
+    const tools = await watchTools(client)
+    Object.assign(allTools, tools)
+  }
+  
+  return allTools
+}
+
+// Usage
+const tools = await connectToServers([
+  "search.smithery.ai",
+  "database.smithery.ai",
+  "analytics.smithery.ai"
+])
+```
+
+### Error Handling
+
+```typescript
+import { wrapError } from "@smithery/sdk"
+
+const tools = await watchTools(client)
+
+try {
+  const result = await generateText({
+    model: openai("gpt-4"),
+    tools,
+    prompt: "Process the data",
+    onToolCall: async ({ toolCall }) => {
+      try {
+        return await toolCall.execute()
+      } catch (error) {
+        // Wrap MCP errors for AI SDK
+        throw wrapError(error)
+      }
+    }
+  })
+} catch (error) {
+  if (error.code === "TOOL_EXECUTION_ERROR") {
+    console.error("Tool failed:", error.toolName, error.details)
+  }
+}
+```
+
+### Tool Middleware
+
+Add logging or validation to tool calls:
+
+```typescript
+const tools = await watchTools(client)
+
+// Wrap tools with middleware
+const wrappedTools = Object.fromEntries(
+  Object.entries(tools).map(([name, tool]) => [
+    name,
+    {
+      ...tool,
+      execute: async (args: any) => {
+        console.log(`[${new Date().toISOString()}] Calling ${name}:`, args)
+        
+        const start = Date.now()
+        try {
+          const result = await tool.execute(args)
+          console.log(`[${name}] Completed in ${Date.now() - start}ms`)
+          return result
+        } catch (error) {
+          console.error(`[${name}] Failed:`, error)
+          throw error
+        }
+      }
+    }
+  ])
+)
+```
+
+## React Integration
+
+```typescript
+import { useChat } from "ai/react"
+import { useEffect, useState } from "react"
+
+function ChatComponent({ serverUrl }: { serverUrl: string }) {
+  const [tools, setTools] = useState<Record<string, Tool>>({})
+  
+  // Setup MCP connection
+  useEffect(() => {
+    async function setup() {
+      const transport = createTransport(serverUrl)
+      const client = new Client({ name: "chat-ui", version: "1.0.0" })
+      await client.connect(transport)
+      
+      const mcpTools = await watchTools(client)
+      setTools(mcpTools)
+    }
+    
+    setup()
+  }, [serverUrl])
+  
+  // Use AI SDK chat hook
+  const { messages, input, handleInputChange, handleSubmit } = useChat({
+    api: "/api/chat",
+    body: {
+      tools: Object.keys(tools)  // Send tool names to API
+    }
+  })
+  
+  return (
+    <div>
+      {messages.map(m => (
+        <div key={m.id}>
+          {m.role}: {m.content}
+          {m.toolInvocations?.map((tool, i) => (
+            <div key={i}>Tool: {tool.toolName}</div>
+          ))}
+        </div>
+      ))}
+      
+      <form onSubmit={handleSubmit}>
+        <input value={input} onChange={handleInputChange} />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  )
+}
+```
+
+## Tool Execution Details
+
+When a tool is called through AI SDK:
+
+1. **Parameter validation** - AI SDK validates against the schema
+2. **Automatic execution** - The tool is called via MCP client
+3. **Result formatting** - Results are formatted for the model
+4. **Error handling** - Errors are caught and wrapped
+
+```typescript
+// Behind the scenes
+async function execute(args: inferParameters<typeof parameters>) {
+  try {
+    // Validate args against schema
+    const validated = parameters.parse(args)
+    
+    // Call MCP tool
+    const result = await client.callTool(name, validated)
+    
+    // Format result for AI SDK
+    return {
+      content: result.content
+    }
+  } catch (error) {
+    // Wrap error for AI SDK
+    throw wrapError(error)
+  }
+}
+```
+
+## Performance Tips
+
+1. **Use watchTools once** - Set up watching at app initialization
+2. **Cache tool definitions** - Tools rarely change during runtime
+3. **Batch tool calls** - Some models can call multiple tools in parallel
+4. **Monitor updates** - Log when tools change to debug issues
+
+## Related
+
+- [Integrations overview](/sdk/integrations) - All integration options
+- [LLM providers](/sdk/integrations/llm-providers) - Provider-specific setup
+- [Client setup](/sdk/client) - MCP client configuration
