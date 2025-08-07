@@ -1,0 +1,212 @@
+---
+title: "Getting Started with Smithery SDK"
+description: "Build your first MCP client and server with the Smithery SDK"
+---
+
+This guide walks you through creating both an MCP client and server using the Smithery SDK.
+
+## Prerequisites
+
+- Node.js 18 or higher
+- npm or yarn
+- A Smithery account (for deployment)
+
+## Project Setup
+
+Create a new directory and initialize your project:
+
+```bash
+mkdir my-mcp-project
+cd my-mcp-project
+npm init -y
+npm install @smithery/sdk @modelcontextprotocol/sdk express zod
+npm install -D @types/node typescript tsx
+```
+
+## Building an MCP Server
+
+### 1. Basic Server Structure
+
+Create `src/server.ts`:
+
+```typescript
+import { createStatefulServer } from "@smithery/sdk"
+import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js"
+import { z } from "zod"
+
+// Optional: Define configuration schema
+export const configSchema = z.object({
+  apiKey: z.string().describe("API key for external service"),
+  maxRetries: z.number().default(3).describe("Maximum retry attempts"),
+})
+
+// Server factory function - called for each new session
+function createMcpServer({ sessionId, config }: { 
+  sessionId: string
+  config: z.infer<typeof configSchema> 
+}) {
+  console.log(`Creating server for session: ${sessionId}`)
+  
+  const server = new Server({
+    name: "my-mcp-server",
+    version: "1.0.0"
+  }, {
+    capabilities: {
+      tools: {}
+    }
+  })
+
+  // List available tools
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      {
+        name: "add_numbers",
+        description: "Add two numbers together",
+        inputSchema: {
+          type: "object",
+          properties: {
+            a: { type: "number", description: "First number" },
+            b: { type: "number", description: "Second number" }
+          },
+          required: ["a", "b"]
+        }
+      }
+    ]
+  }))
+
+  // Handle tool calls
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "add_numbers") {
+      const { a, b } = request.params.arguments as { a: number; b: number }
+      const result = a + b
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${a} + ${b} = ${result}`
+          }
+        ]
+      }
+    }
+    
+    throw new Error(`Unknown tool: ${request.params.name}`)
+  })
+
+  return server
+}
+
+// Create and start the stateful server
+const { app } = createStatefulServer(createMcpServer, {
+  schema: configSchema // Optional: validates config on each request
+})
+
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => {
+  console.log(`MCP server running on port ${PORT}`)
+})
+```
+
+### 2. Run the Server
+
+```bash
+npx tsx src/server.ts
+```
+
+Your server is now running at `http://localhost:3000/mcp`
+
+## Building an MCP Client
+
+### 1. Create the Client
+
+Create `src/client.ts`:
+
+```typescript
+import { createTransport } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+
+async function main() {
+  // Create transport with configuration
+  const transport = createTransport("http://localhost:3000", {
+    config: {
+      apiKey: "test-key",
+      maxRetries: 5
+    }
+  })
+
+  // Initialize client
+  const client = new Client({
+    name: "my-mcp-client",
+    version: "1.0.0"
+  }, {
+    capabilities: {}
+  })
+
+  try {
+    // Connect to server
+    await client.connect(transport)
+    console.log("Connected to server!")
+
+    // List available tools
+    const tools = await client.listTools()
+    console.log("Available tools:", tools)
+
+    // Call a tool
+    const result = await client.callTool("add_numbers", {
+      a: 5,
+      b: 3
+    })
+    console.log("Result:", result)
+  } catch (error) {
+    console.error("Error:", error)
+  } finally {
+    await client.close()
+  }
+}
+
+main().catch(console.error)
+```
+
+### 2. Run the Client
+
+```bash
+# In another terminal
+npx tsx src/client.ts
+```
+
+## Next Steps
+
+Now that you have a basic client and server running:
+
+1. **Add More Tools**: Extend your server with additional capabilities
+2. **Use AI SDK Integration**: Connect your MCP tools to LLMs
+3. **Deploy to Smithery**: Share your server with others
+4. **Add Authentication**: Secure your server with API keys
+
+<CardGroup>
+  <Card
+    title="Server Patterns"
+    icon="server"
+    href="/sdk/server"
+  >
+    Learn about stateful vs stateless servers
+  </Card>
+  <Card
+    title="Configuration"
+    icon="cog"
+    href="/sdk/configuration"
+  >
+    Add configuration validation
+  </Card>
+  <Card
+    title="AI Integration"
+    icon="robot"
+    href="/sdk/integrations/ai-sdk"
+  >
+    Connect to Vercel AI SDK
+  </Card>
+</CardGroup>

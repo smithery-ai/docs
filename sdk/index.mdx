@@ -1,0 +1,148 @@
+---
+title: "Smithery SDK"
+description: "Official TypeScript SDK for building and using MCP servers with Smithery"
+---
+
+## Installation
+
+```bash
+npm install @smithery/sdk @modelcontextprotocol/sdk
+```
+
+## Quick Start
+
+The Smithery SDK provides utilities for both MCP clients and servers, with built-in support for configuration, validation, and integrations.
+
+### Creating a Client
+
+```typescript
+import { createTransport } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+
+// Create a transport to connect to a Smithery server
+const transport = createTransport("https://your-server.smithery.ai", {
+  apiKey: process.env.SMITHERY_API_KEY,
+  config: {
+    // Your server configuration
+    debug: true
+  }
+})
+
+// Initialize the MCP client
+const client = new Client({
+  name: "my-client",
+  version: "1.0.0"
+}, {
+  capabilities: {}
+})
+
+// Connect to the server
+await client.connect(transport)
+```
+
+### Creating a Server
+
+```typescript
+import { createStatefulServer } from "@smithery/sdk"
+import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+
+// Define your server factory function
+function createMcpServer({ sessionId, config }) {
+  const server = new Server({
+    name: "my-server",
+    version: "1.0.0"
+  }, {
+    capabilities: {
+      tools: {}
+    }
+  })
+
+  // Add your tools, resources, etc.
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      {
+        name: "hello",
+        description: "Say hello",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string" }
+          }
+        }
+      }
+    ]
+  }))
+
+  return server
+}
+
+// Create the stateful server
+const app = createStatefulServer(createMcpServer)
+
+// Start listening
+app.listen(process.env.PORT || 3000)
+```
+
+## Core Concepts
+
+<CardGroup>
+  <Card
+    title="Client"
+    icon="plug"
+    href="/sdk/client"
+  >
+    Connect to MCP servers and use their capabilities
+  </Card>
+  <Card
+    title="Server"
+    icon="server"
+    href="/sdk/server"
+  >
+    Build stateful or stateless MCP servers
+  </Card>
+  <Card
+    title="Configuration"
+    icon="cog"
+    href="/sdk/configuration"
+  >
+    Validate and manage server configuration
+  </Card>
+  <Card
+    title="Integrations"
+    icon="puzzle-piece"
+    href="/sdk/integrations"
+  >
+    Integrate with AI SDKs and LLM providers
+  </Card>
+</CardGroup>
+
+## Key Features
+
+- **TypeScript-first**: Full type safety and IntelliSense support
+- **Session Management**: Built-in session stores for stateful servers
+- **Configuration Validation**: Zod schema validation for configs
+- **AI SDK Integration**: Works with Vercel AI SDK out of the box
+- **Express Compatible**: Built on Express for familiar patterns
+
+## API Reference
+
+### Client Utilities
+- [`createTransport`](/sdk/client/transport) - Create HTTP transports for MCP clients
+- [`createSmitheryUrl`](/sdk/client/connections) - Build properly formatted Smithery URLs (pass full URL with protocol)
+
+### Server Utilities  
+- [`createStatefulServer`](/sdk/server/stateful) - Stateful server with session management
+- [Stateless server patterns](/sdk/server/stateless) - Simple stateless server approach
+- [`createLRUStore`](/sdk/server/sessions) - LRU session store implementation
+
+### Configuration
+- [`parseAndValidateConfig`](/sdk/configuration/validation) - Validate configs with Zod
+- [`parseExpressRequestConfig`](/sdk/configuration/schemas) - Parse base64 configs
+
+### Integrations
+- [`watchTools`](/sdk/integrations/ai-sdk) - Vercel AI SDK tool integration
+- [`listTools`](/sdk/integrations/ai-sdk) - Convert MCP tools to AI SDK format
+- [`wrapError`](/sdk/integrations/ai-sdk#error-handling) - Wrap tool calls with error handling
+
+### Utilities
+- [`patch`](/sdk/utilities/patch) - Safely patch object methods with custom behavior
