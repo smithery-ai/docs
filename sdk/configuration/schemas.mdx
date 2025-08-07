@@ -1,0 +1,398 @@
+---
+title: "Configuration Schemas"
+description: "Define and validate configuration schemas with Zod"
+---
+
+Configuration schemas define the structure and validation rules for your MCP server configuration. The Smithery SDK uses Zod for runtime validation and TypeScript type inference.
+
+## Defining Schemas
+
+### Basic Schema
+
+```typescript
+import { z } from "zod"
+
+export const configSchema = z.object({
+  apiKey: z.string().describe("API key for authentication"),
+  environment: z.enum(["development", "production"]).default("production"),
+  port: z.number().min(1).max(65535).default(3000)
+})
+
+// Get TypeScript type
+type Config = z.infer<typeof configSchema>
+```
+
+### Schema Features
+
+#### Descriptions
+
+Add descriptions for auto-generated documentation:
+
+```typescript
+const configSchema = z.object({
+  apiKey: z.string().describe("Your OpenAI API key"),
+  model: z.string().describe("Model to use (e.g., gpt-4)"),
+  temperature: z.number().describe("Sampling temperature (0-2)")
+})
+```
+
+These descriptions appear in:
+- Smithery's configuration UI
+- Error messages
+- Generated documentation
+
+#### Default Values
+
+```typescript
+const configSchema = z.object({
+  // Required with no default
+  apiKey: z.string(),
+  
+  // Optional with default
+  timeout: z.number().default(30000),
+  
+  // Optional with no default
+  webhookUrl: z.string().optional(),
+  
+  // Complex default
+  headers: z.record(z.string()).default({
+    "User-Agent": "MCP-Client/1.0"
+  })
+})
+```
+
+#### Nested Objects
+
+```typescript
+const configSchema = z.object({
+  database: z.object({
+    host: z.string().default("localhost"),
+    port: z.number().default(5432),
+    name: z.string(),
+    credentials: z.object({
+      username: z.string(),
+      password: z.string()
+    })
+  }),
+  
+  cache: z.object({
+    enabled: z.boolean().default(true),
+    ttl: z.number().default(3600),
+    maxSize: z.number().default(1000)
+  }).optional()
+})
+```
+
+## Advanced Validation
+
+### Custom Validators
+
+```typescript
+const configSchema = z.object({
+  // Email validation
+  email: z.string().email("Invalid email format"),
+  
+  // URL validation with custom rules
+  webhookUrl: z.string()
+    .url("Must be a valid URL")
+    .refine(
+      (url) => url.startsWith("https://"),
+      "Webhook URL must use HTTPS"
+    ),
+  
+  // API key format
+  apiKey: z.string().refine(
+    (key) => key.startsWith("sk_") && key.length === 51,
+    "Invalid API key format"
+  ),
+  
+  // Port range
+  port: z.number()
+    .int("Port must be an integer")
+    .min(1024, "Port must be above 1024")
+    .max(65535, "Port must be below 65535")
+})
+```
+
+### Conditional Validation
+
+```typescript
+const configSchema = z.object({
+  authType: z.enum(["none", "apiKey", "oauth"]),
+  apiKey: z.string().optional(),
+  oauthClientId: z.string().optional(),
+  oauthClientSecret: z.string().optional()
+}).refine(
+  (data) => {
+    if (data.authType === "apiKey") {
+      return !!data.apiKey
+    }
+    if (data.authType === "oauth") {
+      return !!data.oauthClientId && !!data.oauthClientSecret
+    }
+    return true
+  },
+  {
+    message: "Required auth credentials missing",
+    path: ["authType"]
+  }
+)
+```
+
+### Cross-Field Validation
+
+```typescript
+const configSchema = z.object({
+  minValue: z.number(),
+  maxValue: z.number(),
+  defaultValue: z.number()
+}).refine(
+  (data) => data.minValue <= data.maxValue,
+  {
+    message: "minValue must be less than or equal to maxValue",
+    path: ["minValue"]
+  }
+).refine(
+  (data) => data.defaultValue >= data.minValue && data.defaultValue <= data.maxValue,
+  {
+    message: "defaultValue must be between minValue and maxValue",
+    path: ["defaultValue"]
+  }
+)
+```
+
+## Transformation
+
+### Data Transformation
+
+```typescript
+const configSchema = z.object({
+  // Parse JSON string
+  features: z.string().transform((str) => {
+    try {
+      return JSON.parse(str)
+    } catch {
+      return {}
+    }
+  }),
+  
+  // Split comma-separated values
+  allowedOrigins: z.string().transform((str) => 
+    str.split(',').map(s => s.trim()).filter(Boolean)
+  ),
+  
+  // Normalize URLs
+  apiEndpoint: z.string().url().transform((url) => {
+    // Remove trailing slash
+    return url.endsWith('/') ? url.slice(0, -1) : url
+  }),
+  
+  // Parse duration strings
+  timeout: z.string().transform((str) => {
+    const match = str.match(/^(\d+)(ms|s|m)$/)
+    if (!match) throw new Error("Invalid duration format")
+    
+    const [, value, unit] = match
+    const multipliers = { ms: 1, s: 1000, m: 60000 }
+    return parseInt(value) * multipliers[unit]
+  })
+})
+```
+
+### Computed Fields
+
+```typescript
+const configSchema = z.object({
+  environment: z.enum(["development", "staging", "production"]),
+  customEndpoint: z.string().optional()
+}).transform((config) => ({
+  ...config,
+  // Add computed fields based on environment
+  apiUrl: config.customEndpoint || {
+    development: "http://localhost:3000",
+    staging: "https://staging-api.example.com",
+    production: "https://api.example.com"
+  }[config.environment],
+  
+  debug: config.environment === "development",
+  
+  logLevel: {
+    development: "debug",
+    staging: "info",
+    production: "error"
+  }[config.environment]
+}))
+```
+
+## Schema Composition
+
+### Extending Schemas
+
+```typescript
+// Base schema
+const baseConfig = z.object({
+  apiKey: z.string(),
+  timeout: z.number().default(5000)
+})
+
+// Extended schema
+const aiConfig = baseConfig.extend({
+  model: z.string().default("gpt-3.5-turbo"),
+  temperature: z.number().min(0).max(2).default(0.7),
+  maxTokens: z.number().optional()
+})
+
+// Multiple extensions
+const advancedConfig = aiConfig.extend({
+  streaming: z.boolean().default(false),
+  functions: z.array(z.string()).optional()
+})
+```
+
+### Merging Schemas
+
+```typescript
+// Feature schemas
+const authSchema = z.object({
+  authToken: z.string(),
+  authEndpoint: z.string().url()
+})
+
+const cachingSchema = z.object({
+  cacheEnabled: z.boolean().default(true),
+  cacheTTL: z.number().default(3600)
+})
+
+// Merge schemas
+const combinedSchema = z.intersection(authSchema, cachingSchema)
+
+// Or use merge
+const mergedSchema = authSchema.merge(cachingSchema)
+```
+
+### Partial and Required
+
+```typescript
+const userSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+  age: z.number().optional(),
+  preferences: z.object({
+    theme: z.string(),
+    language: z.string()
+  }).optional()
+})
+
+// Make all fields optional
+const partialUserSchema = userSchema.partial()
+
+// Make all fields required
+const requiredUserSchema = userSchema.required()
+
+// Make specific fields optional
+const updateSchema = userSchema.partial({
+  email: true,
+  age: true
+})
+```
+
+## Schema Utilities
+
+### Discriminated Unions
+
+```typescript
+const configSchema = z.discriminatedUnion("provider", [
+  z.object({
+    provider: z.literal("openai"),
+    apiKey: z.string(),
+    model: z.string(),
+    maxTokens: z.number()
+  }),
+  z.object({
+    provider: z.literal("anthropic"),
+    apiKey: z.string(),
+    model: z.string(),
+    maxTokenLength: z.number()
+  }),
+  z.object({
+    provider: z.literal("local"),
+    modelPath: z.string(),
+    device: z.enum(["cpu", "gpu"])
+  })
+])
+```
+
+### Dynamic Schemas
+
+```typescript
+function createConfigSchema(features: string[]) {
+  const base = z.object({
+    apiKey: z.string()
+  })
+  
+  // Add feature-specific config
+  const extensions: Record<string, z.ZodObject<any>> = {
+    database: z.object({
+      dbUrl: z.string(),
+      poolSize: z.number()
+    }),
+    cache: z.object({
+      redisUrl: z.string(),
+      ttl: z.number()
+    }),
+    auth: z.object({
+      jwtSecret: z.string(),
+      sessionTimeout: z.number()
+    })
+  }
+  
+  let schema = base
+  for (const feature of features) {
+    if (extensions[feature]) {
+      schema = schema.merge(extensions[feature])
+    }
+  }
+  
+  return schema
+}
+```
+
+## JSON Schema Export
+
+Convert Zod schemas to JSON Schema for documentation:
+
+```typescript
+import { zodToJsonSchema } from "zod-to-json-schema"
+
+const configSchema = z.object({
+  apiKey: z.string().describe("API key for authentication"),
+  model: z.string().describe("AI model to use")
+})
+
+// Convert to JSON Schema
+const jsonSchema = zodToJsonSchema(configSchema, {
+  name: "ServerConfig",
+  $refStrategy: "none"
+})
+
+// Use in OpenAPI documentation
+const openApiSchema = {
+  type: "object",
+  properties: jsonSchema.properties,
+  required: jsonSchema.required
+}
+```
+
+## Best Practices
+
+1. **Always add descriptions** - They appear in Smithery's UI
+2. **Use appropriate defaults** - Make configuration easier
+3. **Validate constraints** - Catch errors early
+4. **Keep schemas focused** - Split large schemas into modules
+5. **Version your schemas** - Handle breaking changes gracefully
+
+## Related
+
+- [Validation guide](/sdk/configuration/validation) - Using schemas for validation
+- [Configuration overview](/sdk/configuration) - Configuration patterns
+- [Server setup](/sdk/server/stateful) - Using schemas in servers
