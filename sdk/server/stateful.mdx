@@ -1,0 +1,429 @@
+---
+title: "Stateful Servers (createStatefulServer)"
+description: "Build MCP servers with session persistence and state management"
+---
+
+The `createStatefulServer` function creates MCP servers that maintain state between requests within a session.
+
+## Function Signature
+
+```typescript
+function createStatefulServer<T = Record<string, unknown>>(
+  createMcpServer: CreateServerFn<T>,
+  options?: StatefulServerOptions<T>
+): { app: express.Application }
+```
+
+## Parameters
+
+### `createMcpServer`
+- **Type**: `CreateServerFn<T>`
+- **Required**: Yes
+- **Description**: Factory function called for each new session
+
+```typescript
+type CreateServerFn<T> = (arg: CreateServerArg<T>) => Server
+
+interface CreateServerArg<T> {
+  sessionId: string  // Unique session identifier
+  config: T         // Validated configuration
+}
+```
+
+### `options`
+- **Type**: `StatefulServerOptions<T>`
+- **Required**: No
+- **Description**: Server configuration options
+
+```typescript
+interface StatefulServerOptions<T> {
+  // Session store for managing active sessions
+  sessionStore?: SessionStore<StreamableHTTPServerTransport>
+  
+  // Zod schema for config validation
+  schema?: z.ZodSchema<T>
+  
+  // Express app instance (optional)
+  app?: express.Application
+}
+```
+
+## Examples
+
+### Basic Stateful Server
+
+```typescript
+import { createStatefulServer } from "@smithery/sdk"
+import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+
+function createMcpServer({ sessionId, config }) {
+  console.log(`New session: ${sessionId}`)
+  
+  // Create session-specific state
+  const messages = []
+  const context = {}
+  
+  const server = new Server({
+    name: "chat-server",
+    version: "1.0.0"
+  })
+
+  // Session-aware tool
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "send_message") {
+      const message = request.params.arguments.message
+      messages.push({
+        timestamp: new Date(),
+        content: message
+      })
+      
+      return {
+        content: [{
+          type: "text",
+          text: `Message ${messages.length} saved in session ${sessionId}`
+        }]
+      }
+    }
+  })
+
+  return server
+}
+
+const { app } = createStatefulServer(createMcpServer)
+app.listen(3000)
+```
+
+### With Configuration Schema
+
+```typescript
+import { z } from "zod"
+
+const configSchema = z.object({
+  model: z.enum(["gpt-3.5", "gpt-4"]).default("gpt-3.5"),
+  temperature: z.number().min(0).max(2).default(0.7),
+  maxHistory: z.number().default(10)
+})
+
+function createMcpServer({ sessionId, config }) {
+  const server = new Server({
+    name: "ai-assistant",
+    version: "1.0.0"
+  })
+
+  // Use validated config
+  const history = []
+  const maxHistory = config.maxHistory
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "chat") {
+      // Add to history with limit
+      history.push(request.params.arguments.message)
+      if (history.length > maxHistory) {
+        history.shift()
+      }
+
+      // Use configured model and temperature
+      const response = await callAI({
+        model: config.model,
+        temperature: config.temperature,
+        messages: history
+      })
+
+      return {
+        content: [{
+          type: "text",
+          text: response
+        }]
+      }
+    }
+  })
+
+  return server
+}
+
+const { app } = createStatefulServer(createMcpServer, {
+  schema: configSchema
+})
+```
+
+### Custom Session Store
+
+```typescript
+import { createLRUStore } from "@smithery/sdk"
+
+// Create custom store with 100 session limit
+const sessionStore = createLRUStore(100)
+
+// Or implement your own
+class RedisSessionStore {
+  constructor(private redis: RedisClient) {}
+  
+  get(id: string) {
+    return this.redis.get(`session:${id}`)
+  }
+  
+  set(id: string, transport: Transport) {
+    this.redis.set(`session:${id}`, transport, 'EX', 3600)
+  }
+  
+  delete(id: string) {
+    this.redis.del(`session:${id}`)
+  }
+}
+
+const app = createStatefulServer(createMcpServer, {
+  sessionStore: new RedisSessionStore(redis),
+  schema: configSchema
+})
+```
+
+### With Express Middleware
+
+```typescript
+import express from "express"
+import cors from "cors"
+
+// Create Express app with middleware
+const app = express()
+app.use(cors())
+app.use(express.json())
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" })
+})
+
+// Add stateful MCP server
+const { app: mcpApp } = createStatefulServer(createMcpServer, {
+  app, // Use existing Express app
+  schema: configSchema
+})
+
+mcpApp.listen(3000)
+```
+
+## Session Lifecycle
+
+### Session Creation
+
+1. Client connects to `/mcp` endpoint
+2. New session ID generated (UUID)
+3. `createMcpServer` called with session ID
+4. Server instance stored in session store
+
+### Session Usage
+
+```typescript
+function createMcpServer({ sessionId, config }) {
+  // Session state persists between requests
+  const state = {
+    startTime: new Date(),
+    requestCount: 0,
+    data: new Map()
+  }
+
+  const server = new Server({
+    name: "stateful-demo",
+    version: "1.0.0"
+  })
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    state.requestCount++
+    
+    if (request.params.name === "get_stats") {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            sessionId,
+            uptime: Date.now() - state.startTime.getTime(),
+            requests: state.requestCount
+          })
+        }]
+      }
+    }
+  })
+
+  return server
+}
+```
+
+### Configuration Discovery Endpoint
+
+Stateful servers expose a configuration discovery endpoint for clients to retrieve the JSON Schema describing expected configuration:
+
+```text
+GET /.well-known/mcp-config
+Content-Type: application/schema+json; charset=utf-8
+```
+
+- Returns a JSON Schema reflecting the `schema` passed to `createStatefulServer`
+- Includes metadata such as `x-mcp-version` and `x-query-style`
+- Useful for tooling and UI to render config forms
+
+```typescript
+const { app } = createStatefulServer(createMcpServer, { schema: configSchema })
+// Now available at: /.well-known/mcp-config
+```
+
+### Session Cleanup
+
+```typescript
+function createMcpServer({ sessionId, config }) {
+  const server = new Server({
+    name: "cleanup-demo",
+    version: "1.0.0"
+  })
+
+  // Cleanup resources on close
+  server.close = async () => {
+    console.log(`Cleaning up session ${sessionId}`)
+    // Close database connections
+    // Clear timers
+    // Release resources
+  }
+
+  return server
+}
+```
+
+## Use Cases
+
+### 1. Conversational AI
+
+```typescript
+function createMcpServer({ sessionId, config }) {
+  const conversation = []
+  
+  const server = new Server({
+    name: "chat-bot",
+    version: "1.0.0"
+  })
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "chat") {
+      conversation.push({
+        role: "user",
+        content: request.params.arguments.message
+      })
+
+      const response = await generateResponse(conversation)
+      
+      conversation.push({
+        role: "assistant",
+        content: response
+      })
+
+      return {
+        content: [{
+          type: "text",
+          text: response
+        }]
+      }
+    }
+  })
+
+  return server
+}
+```
+
+### 2. Multi-Step Workflows
+
+```typescript
+function createMcpServer({ sessionId, config }) {
+  const workflow = {
+    currentStep: 0,
+    data: {},
+    completed: false
+  }
+
+  const server = new Server({
+    name: "workflow-engine",
+    version: "1.0.0"
+  })
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params
+
+    switch (name) {
+      case "next_step":
+        workflow.currentStep++
+        workflow.data[`step${workflow.currentStep}`] = args
+        
+        if (workflow.currentStep >= 3) {
+          workflow.completed = true
+          return {
+            content: [{
+              type: "text",
+              text: "Workflow completed!"
+            }]
+          }
+        }
+        
+        return {
+          content: [{
+            type: "text",
+            text: `Step ${workflow.currentStep} completed`
+          }]
+        }
+    }
+  })
+
+  return server
+}
+```
+
+### 3. Authenticated Sessions
+
+```typescript
+function createMcpServer({ sessionId, config }) {
+  let authenticated = false
+  let userData = null
+
+  const server = new Server({
+    name: "auth-server",
+    version: "1.0.0"
+  })
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params
+
+    if (name === "login" && !authenticated) {
+      const user = await authenticateUser(args.username, args.password)
+      if (user) {
+        authenticated = true
+        userData = user
+        return {
+          content: [{
+            type: "text",
+            text: "Login successful"
+          }]
+        }
+      }
+      throw new Error("Invalid credentials")
+    }
+
+    if (!authenticated) {
+      throw new Error("Not authenticated")
+    }
+
+    // Authenticated-only tools...
+  })
+
+  return server
+}
+```
+
+## Best Practices
+
+1. **Initialize state in factory**: Create session state in `createMcpServer`
+2. **Avoid global state**: Each session should be isolated
+3. **Clean up resources**: Implement cleanup in server.close()
+4. **Limit session count**: Use appropriate session store limits
+5. **Handle errors gracefully**: Sessions may disconnect unexpectedly
+
+## Related
+
+- [Stateless servers](/sdk/server/stateless) - Simpler alternative
+- [Session management](/sdk/server/sessions) - Session store details
+- [Configuration validation](/sdk/configuration) - Config schemas
