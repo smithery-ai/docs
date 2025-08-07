@@ -1,0 +1,448 @@
+---
+title: "Session Management"
+description: "Manage sessions and state in stateful MCP servers"
+---
+
+Session management is crucial for stateful MCP servers. The SDK provides built-in session stores and patterns for managing server instances across multiple client connections.
+
+## Session Store Interface
+
+All session stores implement this interface:
+
+```typescript
+interface SessionStore<T extends Transport> {
+  // Retrieve existing transport (or undefined)
+  get(id: string): T | undefined
+  
+  // Insert or update transport
+  set(id: string, transport: T): void
+  
+  // Optional: explicit eviction
+  delete?(id: string): void
+}
+```
+
+## Built-in LRU Store
+
+The SDK includes `createLRUStore` for simple session management:
+
+### Basic Usage
+
+```typescript
+import { createLRUStore, createStatefulServer } from "@smithery/sdk"
+
+// Create store with max 1000 sessions
+const sessionStore = createLRUStore(1000)
+
+const app = createStatefulServer(createMcpServer, {
+  sessionStore
+})
+```
+
+### How LRU Works
+
+```typescript
+const store = createLRUStore(3)  // Max 3 sessions
+
+// Add sessions
+store.set("user1", transport1)  // [user1]
+store.set("user2", transport2)  // [user1, user2]
+store.set("user3", transport3)  // [user1, user2, user3]
+
+// Access user1 (moves to end)
+store.get("user1")              // [user2, user3, user1]
+
+// Add user4 (evicts user2)
+store.set("user4", transport4)  // [user3, user1, user4]
+```
+
+### LRU Implementation Details
+
+```typescript
+export const createLRUStore = <T extends Transport>(
+  max = 1000
+): SessionStore<T> => {
+  const cache = new Map<string, T>()
+
+  return {
+    get: (id) => {
+      const transport = cache.get(id)
+      if (!transport) return undefined
+      
+      // Refresh position
+      cache.delete(id)
+      cache.set(id, transport)
+      return transport
+    },
+
+    set: (id, transport) => {
+      if (cache.has(id)) {
+        // Update existing
+        cache.delete(id)
+      } else if (cache.size >= max) {
+        // Evict oldest
+        const [lruId, lruTransport] = cache.entries().next().value
+        lruTransport.close?.()
+        cache.delete(lruId)
+      }
+      cache.set(id, transport)
+    },
+
+    delete: (id) => {
+      // Removes entry from the cache (does not close transport)
+      cache.delete(id)
+    }
+  }
+}
+```
+
+## Custom Session Stores
+
+### Redis Session Store
+
+```typescript
+import Redis from "ioredis"
+
+class RedisSessionStore implements SessionStore<Transport> {
+  constructor(
+    private redis: Redis,
+    private ttl: number = 3600  // 1 hour default
+  ) {}
+
+  async get(id: string): Promise<Transport | undefined> {
+    const data = await this.redis.get(`session:${id}`)
+    if (!data) return undefined
+    
+    // Deserialize transport
+    const transport = deserializeTransport(data)
+    
+    // Extend TTL on access
+    await this.redis.expire(`session:${id}`, this.ttl)
+    
+    return transport
+  }
+
+  async set(id: string, transport: Transport): Promise<void> {
+    const data = serializeTransport(transport)
+    await this.redis.setex(`session:${id}`, this.ttl, data)
+  }
+
+  async delete(id: string): Promise<void> {
+    const transport = await this.get(id)
+    transport?.close?.()
+    await this.redis.del(`session:${id}`)
+  }
+}
+
+// Usage
+const sessionStore = new RedisSessionStore(redis, 7200)
+const app = createStatefulServer(createMcpServer, {
+  sessionStore
+})
+```
+
+### Database Session Store
+
+```typescript
+import { Pool } from "pg"
+
+class PostgresSessionStore implements SessionStore<Transport> {
+  constructor(private pool: Pool) {}
+
+  async get(id: string): Promise<Transport | undefined> {
+    const client = await this.pool.connect()
+    try {
+      const result = await client.query(
+        'SELECT data FROM sessions WHERE id = $1 AND expires_at > NOW()',
+        [id]
+      )
+      
+      if (result.rows.length === 0) return undefined
+      
+      // Update last accessed
+      await client.query(
+        'UPDATE sessions SET last_accessed = NOW() WHERE id = $1',
+        [id]
+      )
+      
+      return deserializeTransport(result.rows[0].data)
+    } finally {
+      client.release()
+    }
+  }
+
+  async set(id: string, transport: Transport): Promise<void> {
+    const client = await this.pool.connect()
+    try {
+      await client.query(`
+        INSERT INTO sessions (id, data, created_at, last_accessed, expires_at)
+        VALUES ($1, $2, NOW(), NOW(), NOW() + INTERVAL '1 hour')
+        ON CONFLICT (id) DO UPDATE
+        SET data = $2, last_accessed = NOW(), expires_at = NOW() + INTERVAL '1 hour'
+      `, [id, serializeTransport(transport)])
+    } finally {
+      client.release()
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    const transport = await this.get(id)
+    transport?.close?.()
+    
+    const client = await this.pool.connect()
+    try {
+      await client.query('DELETE FROM sessions WHERE id = $1', [id])
+    } finally {
+      client.release()
+    }
+  }
+}
+```
+
+### Memory-Mapped Session Store
+
+```typescript
+class MemoryMappedStore implements SessionStore<Transport> {
+  private sessions = new Map<string, {
+    transport: Transport,
+    data: Map<string, any>,
+    lastAccessed: Date
+  }>()
+
+  constructor(
+    private maxSessions = 1000,
+    private maxAge = 3600000  // 1 hour
+  ) {
+    // Periodic cleanup
+    setInterval(() => this.cleanup(), 60000)
+  }
+
+  get(id: string): Transport | undefined {
+    const session = this.sessions.get(id)
+    if (!session) return undefined
+    
+    // Check if expired
+    if (Date.now() - session.lastAccessed.getTime() > this.maxAge) {
+      this.delete(id)
+      return undefined
+    }
+    
+    session.lastAccessed = new Date()
+    return session.transport
+  }
+
+  set(id: string, transport: Transport): void {
+    // Evict if at capacity
+    if (!this.sessions.has(id) && this.sessions.size >= this.maxSessions) {
+      this.evictOldest()
+    }
+    
+    this.sessions.set(id, {
+      transport,
+      data: new Map(),
+      lastAccessed: new Date()
+    })
+  }
+
+  delete(id: string): void {
+    const session = this.sessions.get(id)
+    session?.transport.close?.()
+    this.sessions.delete(id)
+  }
+
+  private cleanup(): void {
+    const now = Date.now()
+    for (const [id, session] of this.sessions) {
+      if (now - session.lastAccessed.getTime() > this.maxAge) {
+        this.delete(id)
+      }
+    }
+  }
+
+  private evictOldest(): void {
+    let oldestId: string | null = null
+    let oldestTime = Date.now()
+    
+    for (const [id, session] of this.sessions) {
+      if (session.lastAccessed.getTime() < oldestTime) {
+        oldestTime = session.lastAccessed.getTime()
+        oldestId = id
+      }
+    }
+    
+    if (oldestId) {
+      this.delete(oldestId)
+    }
+  }
+}
+```
+
+## Session Patterns
+
+### 1. Session with Context
+
+```typescript
+class ContextualSessionStore extends Map {
+  private contexts = new Map<string, any>()
+  
+  setContext(sessionId: string, key: string, value: any) {
+    const ctx = this.contexts.get(sessionId) || {}
+    ctx[key] = value
+    this.contexts.set(sessionId, ctx)
+  }
+  
+  getContext(sessionId: string, key: string) {
+    return this.contexts.get(sessionId)?.[key]
+  }
+  
+  delete(sessionId: string) {
+    super.delete(sessionId)
+    this.contexts.delete(sessionId)
+  }
+}
+
+// Usage in server
+function createMcpServer({ sessionId, config }) {
+  const store = getSessionStore()  // Get injected store
+  
+  const server = new Server(/* ... */)
+  
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "set_context") {
+      store.setContext(sessionId, "user", request.params.arguments.user)
+      return { content: [{ type: "text", text: "Context set" }] }
+    }
+    
+    if (request.params.name === "get_context") {
+      const user = store.getContext(sessionId, "user")
+      return { content: [{ type: "text", text: `User: ${user}` }] }
+    }
+  })
+  
+  return server
+}
+```
+
+### 2. Session Metrics
+
+```typescript
+class MetricsSessionStore implements SessionStore<Transport> {
+  private base: SessionStore<Transport>
+  private metrics = {
+    hits: 0,
+    misses: 0,
+    evictions: 0,
+    activeCount: 0
+  }
+  
+  constructor(base: SessionStore<Transport>) {
+    this.base = base
+  }
+  
+  get(id: string): Transport | undefined {
+    const result = this.base.get(id)
+    if (result) {
+      this.metrics.hits++
+    } else {
+      this.metrics.misses++
+    }
+    return result
+  }
+  
+  set(id: string, transport: Transport): void {
+    const exists = this.base.get(id) !== undefined
+    this.base.set(id, transport)
+    if (!exists) {
+      this.metrics.activeCount++
+    }
+  }
+  
+  delete(id: string): void {
+    if (this.base.get(id)) {
+      this.metrics.activeCount--
+      this.metrics.evictions++
+    }
+    this.base.delete?.(id)
+  }
+  
+  getMetrics() {
+    return {
+      ...this.metrics,
+      hitRate: this.metrics.hits / (this.metrics.hits + this.metrics.misses)
+    }
+  }
+}
+```
+
+### 3. Distributed Sessions
+
+```typescript
+import { Cluster } from "ioredis"
+
+class ClusteredSessionStore implements SessionStore<Transport> {
+  private localCache = new Map<string, Transport>()
+  
+  constructor(
+    private cluster: Cluster,
+    private nodeId: string
+  ) {}
+  
+  async get(id: string): Promise<Transport | undefined> {
+    // Check local cache first
+    if (this.localCache.has(id)) {
+      return this.localCache.get(id)
+    }
+    
+    // Check cluster
+    const owner = await this.cluster.get(`session-owner:${id}`)
+    if (owner === this.nodeId) {
+      // We should have it locally
+      return undefined
+    }
+    
+    // Session exists on another node
+    throw new Error(`Session ${id} is on node ${owner}`)
+  }
+  
+  async set(id: string, transport: Transport): Promise<void> {
+    // Claim ownership
+    await this.cluster.set(`session-owner:${id}`, this.nodeId, "EX", 3600)
+    this.localCache.set(id, transport)
+  }
+}
+```
+
+## Best Practices
+
+1. **Choose appropriate limits**: Balance memory usage with user experience
+2. **Implement cleanup**: Remove stale sessions to free resources
+3. **Monitor metrics**: Track hit rates and eviction patterns
+4. **Handle failures gracefully**: Sessions may be lost unexpectedly
+5. **Consider persistence**: For critical applications, use persistent stores
+
+## Performance Tuning
+
+### Memory Optimization
+
+```typescript
+// Tune based on average session size and available memory
+const maxSessions = Math.floor(availableMemory / averageSessionSize * 0.8)
+const sessionStore = createLRUStore(maxSessions)
+```
+
+### TTL Configuration
+
+```typescript
+// Adjust based on usage patterns
+const ttlByUserType = {
+  free: 1800,      // 30 minutes
+  premium: 7200,   // 2 hours
+  enterprise: 0    // No expiry
+}
+```
+
+## Related
+
+- [Stateful servers](/sdk/server/stateful) - Using session stores
+- [Server patterns](/sdk/server) - Choosing server types
+- [Performance guide](/sdk/guides/performance) - Optimization tips
