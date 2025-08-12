@@ -1,0 +1,47 @@
+---
+title: "Custom Container Deployment"
+description: "Migrate to HTTP using custom Docker containers for any language or advanced control"
+---
+
+# Custom Container Deployment
+
+This guide covers migrating MCP servers to HTTP using custom Docker containers. This approach gives you full control over your deployment environment and supports any programming language.
+
+## Overview
+
+Custom container deployment is ideal when you:
+- Use languages other than TypeScript (Python, Go, Rust, etc.)
+- Need full control over your Docker environment
+- Have complex dependencies or custom build processes
+- Want to implement HTTP transport manually
+
+## Key Requirements
+
+Your custom container must:
+1. **HTTP Endpoint**: Serve `/mcp` endpoint handling `GET`, `POST`, `DELETE` requests
+2. **Port Configuration**: Listen on `PORT` environment variable
+3. **Configuration Parsing**: Parse base64 encoded config from query parameters
+4. **MCP Protocol**: Implement [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) transport
+
+## Choose Your Language
+
+Select your programming language for detailed migration instructions:
+
+<CardGroup cols={2}>
+<Card title="TypeScript Custom Container" icon="code" href="/migrations/typescript-custom-container">
+Full Docker control for TypeScript projects with custom middleware and dependencies
+</Card>
+<Card title="Python Custom Container" icon="python" href="/migrations/python-custom-container">
+FastMCP with custom middleware for Python projects requiring full container control
+</Card>
+</CardGroup>
+
+Both approaches show you how to build a stateless MCP server with:
+- A `greet` tool that validates API keys from Smithery configuration
+- Proper CORS handling for browser-based clients
+- Custom middleware for configuration parsing
+- Production-ready deployment patterns
+
+---
+
+**Need help?** Join our [Discord](https://discord.gg/Afd38S5p9A) or email [support@smithery.ai](mailto:support@smithery.ai) for assistance.

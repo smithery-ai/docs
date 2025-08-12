@@ -1,0 +1,281 @@
+---
+title: "TypeScript Custom Container"
+description: "Migrate TypeScript MCP servers to HTTP using custom Docker containers with full control"
+---
+
+# TypeScript Custom Container
+
+This guide covers migrating TypeScript MCP servers to HTTP using custom Docker containers when you need full control over your deployment environment.
+
+## When to Use This Approach
+
+Choose TypeScript custom containers when you:
+- Need full control over your Docker environment
+- Have complex dependencies or custom build processes
+- Want to implement HTTP transport manually
+- Need specific middleware or custom server logic
+
+<Note>
+**Alternative**: If you're using the official MCP SDK and want automatic deployment, consider [TypeScript with Smithery CLI](/migrations/typescript-with-smithery-cli) instead.
+</Note>
+
+## What We're Building
+
+We'll build a simple stateless MCP server with a `greet` tool that:
+- Takes a user's name and returns a greeting
+- Validates an API key from Smithery configuration
+- Shows proper CORS handling and middleware setup
+
+## Code Migration
+
+<CodeGroup>
+
+```typescript Before (STDIO)
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+const server = new Server({
+  name: "example-server",
+  version: "1.0.0"
+}, {
+  capabilities: { tools: {} }
+});
+
+// Add your tools
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  return { tools: [...] };
+});
+
+// STDIO transport
+const transport = new StdioServerTransport();
+await server.connect(transport);
+```
+
+```typescript After (HTTP Container)
+import express, { Request, Response } from "express";
+import cors from "cors";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamable-http.js";
+import { z } from "zod";
+
+const app = express();
+const PORT = process.env.PORT || 8000;
+
+// CORS configuration for browser-based MCP clients
+app.use(cors({
+  origin: '*', // Configure appropriately for production
+  exposedHeaders: ['Mcp-Session-Id'],
+  allowedHeaders: ['Content-Type', 'mcp-session-id'],
+}));
+
+app.use(express.json());
+
+// Parse configuration from query parameters
+function parseConfig(req: Request) {
+  const configParam = req.query.config as string;
+  if (configParam) {
+    return JSON.parse(Buffer.from(configParam, 'base64').toString());
+  }
+  return {};
+}
+
+// Create MCP server with your tools
+function createServer(config: any) {
+  const server = new McpServer({
+    name: "example-server",
+    version: "1.0.0",
+  });
+
+  // Add greet tool
+  server.tool("greet", "Greet someone by name", {
+    name: z.string().describe("Name to greet")
+  }, async ({ name }) => {
+    // Verify API key is provided
+    if (!config.apiKey) {
+      throw new Error("API key is required");
+    }
+    
+    // Use config.apiKey for authentication/API calls
+    return { content: [{ type: "text", text: `Hello, ${name}! (authenticated with ${config.apiKey.substring(0, 8)}...)` }] };
+  });
+
+  return server;
+}
+
+// Handle MCP requests at /mcp endpoint
+app.all('/mcp', async (req: Request, res: Response) => {
+  try {
+    const config = parseConfig(req);
+    const server = createServer(config);
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+
+    // Clean up on request close
+    res.on('close', () => {
+      transport.close();
+      server.close();
+    });
+
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (error) {
+    console.error('Error handling MCP request:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: { code: -32603, message: 'Internal server error' },
+        id: null,
+      });
+    }
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`MCP HTTP Server listening on port ${PORT}`);
+});
+```
+
+</CodeGroup>
+
+<Note>
+**Configuration is Optional**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can remove all the config parsing and validation code. The server will work perfectly fine without it.
+</Note>
+
+## Configuration Changes
+
+### Update smithery.yaml
+
+<CodeGroup>
+
+```yaml Before (STDIO)
+startCommand:
+  type: stdio
+  commandFunction: |
+    (config) => ({
+      command: 'node',
+      args: ['dist/index.js'],
+      env: {
+        API_KEY: config.apiKey
+      }
+    })
+  configSchema:
+    type: object
+    required: [apiKey]
+    properties:
+      apiKey:
+        type: string
+        description: Your API key
+  exampleConfig:
+    apiKey: "sk-example-123"
+```
+
+```yaml After (HTTP Container)
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"           # Path to your Dockerfile
+  dockerBuildPath: "."               # Docker build context
+startCommand:
+  type: "http"
+  configSchema:                      # Optional: Define configuration schema
+    type: object
+    required: [apiKey]
+    properties:
+      apiKey:
+        type: string
+        description: Your API key
+  exampleConfig:                     # Optional: Example configuration
+    apiKey: "sk-example-123"
+```
+
+</CodeGroup>
+
+### Update Dockerfile
+
+<CodeGroup>
+
+```dockerfile Before (STDIO)
+FROM node:18-slim
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+RUN npm run build
+
+# STDIO servers don't expose ports
+CMD ["node", "dist/index.js"]
+```
+
+```dockerfile After (HTTP Container)
+FROM node:18-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+RUN npm run build
+
+# HTTP servers must expose the port
+EXPOSE 8000
+CMD ["node", "dist/server.js"]
+```
+
+</CodeGroup>
+
+### package.json
+
+```json
+{
+  "name": "my-mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.0",
+    "express": "^4.18.0",
+    "cors": "^2.8.5"
+  }
+}
+```
+
+## Local Testing
+
+```bash
+# Build and run locally
+docker build -t my-mcp-server .
+docker run -p 8000:8000 -e PORT=8000 my-mcp-server
+
+# Test MCP endpoint
+curl -X POST http://localhost:8000/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+```
+
+## Deployment
+
+1. **Push Code**: Push your updated code (including `Dockerfile` and `smithery.yaml`) to GitHub
+2. **Deploy**: Go to [smithery.ai/new](https://smithery.ai/new) and connect your GitHub repository
+3. **Verify**: Test your deployed server through the Smithery interface
+
+Smithery will automatically build your container and host your MCP server, making it available to over 10,000 users.
+
+## Key Changes Summary
+
+1. **HTTP Server**: Implement Express server that serves `/mcp` endpoint
+2. **CORS Configuration**: Enable browser-based MCP clients with proper headers
+3. **Configuration Parsing**: Parse base64 encoded config from query parameters
+4. **Container Runtime**: Set `runtime: "container"` in `smithery.yaml`
+5. **Dockerfile**: Create Dockerfile that exposes the correct port
+6. **MCP Protocol**: Use `StreamableHTTPServerTransport` for MCP communication
+
+---
+
+**Need help?** Join our [Discord](https://discord.gg/Afd38S5p9A) or email [support@smithery.ai](mailto:support@smithery.ai) for assistance.

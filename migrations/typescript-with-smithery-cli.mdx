@@ -1,0 +1,179 @@
+---
+title: "TypeScript with Smithery CLI"
+description: "Migrate your TypeScript MCP servers from STDIO to HTTP using Smithery CLI"
+---
+
+# TypeScript with Smithery CLI
+
+This guide covers migrating TypeScript MCP servers that use the official MCP SDK from STDIO to HTTP transport using Smithery CLI.
+
+## Overview
+
+For TypeScript projects, migration involves converting your server to export a function instead of connecting to transport directly. The Smithery CLI handles the HTTP transport automatically.
+
+**What we're building**: A simple stateless MCP server with a `greet` tool that takes a user's name and returns a personalized greeting. The server validates an API key from Smithery configuration to demonstrate secure configuration handling.
+
+**Entry Point**: This is your main server file (can be `src/index.ts`, `src/server.ts`, or any filename). This file must export your MCP server so Smithery CLI can build and deploy it.
+
+## Code Changes
+
+<CodeGroup>
+
+```typescript After (HTTP)
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+
+// Define configuration schema
+export const configSchema = z.object({
+  apiKey: z.string().describe("Your API key")
+});
+
+export default function ({ config }: { config: z.infer<typeof configSchema> }) {
+  const server = new McpServer({
+    name: "example-server",
+    version: "1.0.0",
+  });
+
+  // Add greet tool
+  server.tool("greet", "Greet someone by name", {
+    name: z.string().describe("Name to greet")
+  }, async ({ name }) => {
+    // Verify API key is provided
+    if (!config.apiKey) {
+      throw new Error("API key is required");
+    }
+    
+    return { content: [{ type: "text", text: `Hello, ${name}! (authenticated with ${config.apiKey.substring(0, 8)}...)` }] };
+  });
+
+  return server.server; // Export the server
+}
+```
+
+```typescript Before (STDIO)
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+const server = new Server({
+  name: "example-server",
+  version: "1.0.0"
+}, {
+  capabilities: { tools: {} }
+});
+
+// Add your tools
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  return { tools: [...] };
+});
+
+// STDIO transport
+const transport = new StdioServerTransport();
+await server.connect(transport);
+```
+
+</CodeGroup>
+
+## Configuration Changes
+
+### Update package.json
+
+Configure `package.json` so Smithery CLI can find your exported server:
+
+```json
+{
+  "name": "my-mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "module": "src/index.ts", // [!code highlight]
+  "scripts": {
+    "build": "npx @smithery/cli build", // [!code highlight]
+    "dev": "npx @smithery/cli dev" // [!code highlight]
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.0",
+    "zod": "^3.25.0"
+  }
+}
+```
+
+### Update smithery.yaml
+
+<CodeGroup>
+
+```yaml After (HTTP)
+runtime: "typescript"
+```
+
+```yaml Before (STDIO)
+startCommand:
+  type: stdio
+  commandFunction: |
+    (config) => ({
+      command: 'npx',
+      args: ['tsx', 'src/index.ts'],
+      env: {
+        API_KEY: config.apiKey
+      }
+    })
+  configSchema:
+    type: object
+    required: [apiKey]
+    properties:
+      apiKey:
+        type: string
+        description: Your API key
+  exampleConfig:
+    apiKey: "sk-example-123"
+```
+
+</CodeGroup>
+
+That's it! The Smithery CLI handles the HTTP transport automatically.
+
+<Note>
+**No Dockerfile needed**: Unlike custom container deployments, TypeScript projects using Smithery CLI don't require a Dockerfile. The CLI handles containerization automatically.
+</Note>
+
+## Local Testing
+
+### Using Smithery Interactive Playground
+
+```bash
+# Start development server with interactive playground
+npm run dev
+```
+
+The `npm run dev` command opens the **Smithery interactive playground** where you can:
+- Test your MCP server tools in real-time
+- See tool responses and debug issues
+- Validate your configuration schema
+- Experiment with different inputs
+
+### Building for Production
+
+```bash
+# Build your server for deployment
+npm run build
+```
+
+This compiles your TypeScript code and prepares it for deployment on Smithery.
+
+## Deployment
+
+1. **Push Code**: Push your updated code (including updated `package.json` and `smithery.yaml`) to GitHub
+2. **Deploy**: Go to [smithery.ai/new](https://smithery.ai/new) and connect your GitHub repository
+3. **Verify**: Test your deployed server through the Smithery interface
+
+The TypeScript runtime handles HTTP transport automatically - no additional configuration needed.
+
+## Key Changes Summary
+
+1. **Export Function**: Export a default function that returns `server.server`
+2. **Configuration Schema**: Export `configSchema` using Zod for type safety
+3. **Package.json Module Field**: Set `module` field to point to your server export file
+4. **Runtime Configuration**: Set `runtime: "typescript"` in `smithery.yaml`
+5. **Remove Transport Code**: Smithery CLI handles HTTP transport automatically
+
+---
+
+**Need help?** Join our [Discord](https://discord.gg/Afd38S5p9A) or email [support@smithery.ai](mailto:support@smithery.ai) for assistance.
