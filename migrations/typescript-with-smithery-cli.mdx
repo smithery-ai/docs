@@ -11,9 +11,18 @@ This guide covers migrating TypeScript MCP servers that use the official MCP SDK
 
 For TypeScript projects, migration involves converting your server to export a function instead of connecting to transport directly. The Smithery CLI handles the HTTP transport automatically.
 
-**What we're building**: A simple stateless MCP server with a `greet` tool that takes a user's name and returns a personalized greeting. The server validates an API key from Smithery configuration to demonstrate secure configuration handling.
-
 **Entry Point**: This is your main server file (can be `src/index.ts`, `src/server.ts`, or any filename). This file must export your MCP server so Smithery CLI can build and deploy it.
+
+## What We're Building
+
+We'll build a simple stateless MCP server with a `greet` tool that:
+- Takes a user's name and returns a personalized greeting
+- Validates an API key from Smithery configuration to demonstrate secure configuration handling
+- Uses Smithery CLI for automatic HTTP transport and containerization
+
+<Note>
+**Full Implementation**: For complete working examples with all dependencies and configuration files, check our [example repositories](https://github.com/smithery-ai/mcp-examples) on GitHub.
+</Note>
 
 ## Code Changes
 
