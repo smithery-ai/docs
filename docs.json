@@ -54,7 +54,6 @@
 				"group": "Build MCP Servers",
 				"pages": [
 					"build/index",
-					"build/getting-started",
 					"build/deployments",
 					"build/session-config",
 					{

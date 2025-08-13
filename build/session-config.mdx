@@ -3,7 +3,9 @@ title: 'Session Configuration'
 description: 'Allow clients to connect to MCP servers with a specific configuration.'
 ---
 
-Session configurations are JSON objects that customize how an MCP server behaves for a specific client connection. Configurations allow each client-server session to operate differently, and is a way to securely pass secrets (e.g., API keys) to your server.
+Session configurations let you give your users flexibility in how your MCP server behaves for their specific connection. Think of it like your coffee order - each time you visit, you can choose something completely different. You're never stuck with the same drink.
+
+Similarly, configurations allow each of your users to customize their session differently, and provide a secure way for them to pass secrets (e.g., API keys) to your server.
 
 ## How Configurations Work
 
@@ -13,10 +15,9 @@ Every MCP server can define what configuration parameters it accepts. These para
   Configurations are bound to individual sessions. Each client connection has its own configuration that doesn't affect other sessions.
 </Info>
 
-## How Configs Are Declared
+## Define Your Configuration Schema
 
-Session configurations are defined by the author of the MCP.
-MCP server developers define their configuration requirements using JSON Schema in the `configSchema` field of their [`smithery.yaml`](/build/project-config/smithery-yaml) file:
+Define what configuration your MCP server needs using JSON Schema in your [`smithery.yaml`](/build/project-config/smithery-yaml) file:
 
 ```yaml smithery.yaml
 startCommand:
@@ -53,19 +54,62 @@ The `configSchema` supports all standard JSON Schema features:
 
 The schema is used to both validate configurations and generate user interfaces in the Smithery web app.
 
-## Supplying Configs at Connection Time
+## How Your Server Receives Configuration
 
-When connecting to an MCP server, clients must provide a configuration that satisfies the server's schema. This happens in two steps:
+**Your MCP server receives configuration as a base64-encoded JSON object** in the `config` query parameter:
 
-1. **Retrieve the schema**: The [Registry API](/use/registry) returns the `configSchema` as part of the server connection details
-2. **Send the config**: When establishing a connection, provide the configuration using dot-notation query parameters in the [connection URL](/use/connect). For example, `?server.host=localhost&server.port=8080&debug=true`.
+```
+GET/POST /mcp?config=eyJzZXJ2ZXIiOnsiaG9zdCI6ImxvY2FsaG9zdCIsInBvcnQiOjgwODB9LCJkZWJ1ZyI6dHJ1ZX0=
+```
 
-Users who connect to your server on Smithery may prefer to use [Configuration Profiles](/use/profiles). When a profile is used, Smithery's gateway injects the correct query parameters when connecting to your MCP server.
+To parse this configuration in your server:
 
-#### Reserved Parameters
-The following parameters are reserved and won't be passed to servers:
-- `api_key` (Smithery authentication)
-- `profile` (saved configuration profiles)
+<CodeGroup>
+
+```typescript TypeScript
+// Parse configuration from query parameters
+function parseConfig(req: Request) {
+  const url = new URL(req.url);
+  const configParam = url.searchParams.get('config');
+  if (configParam) {
+    return JSON.parse(Buffer.from(configParam, 'base64').toString());
+  }
+  return {};
+}
+
+// Usage in your MCP tool
+const config = parseConfig(request);
+const dbUrl = config.connectionString;
+const maxResults = config.maxResults || 10;
+
+// Each session connects to their own database
+```
+
+```python Python
+import json
+import base64
+from urllib.parse import parse_qs, urlparse
+
+def parse_config(request_url: str) -> dict:
+    """Parse base64-encoded config from query parameters."""
+    parsed_url = urlparse(request_url)
+    params = parse_qs(parsed_url.query)
+    
+    if 'config' in params:
+        config_b64 = params['config'][0]
+        config_json = base64.b64decode(config_b64).decode('utf-8')
+        return json.loads(config_json)
+    
+    return {}
+
+# Usage
+config = parse_config(request.url)
+print(config)  # {'server': {'host': 'localhost', 'port': 8080}, 'debug': True}
+```
+
+</CodeGroup>
+
+
 
 ## Examples
 
@@ -147,7 +191,5 @@ You can view any MCP server's configuration schema in its API Tab on the server 
 
 ## See Also
 
-- [Configuration Profiles](/use/profiles) - Save and reuse configurations
-- [Registry API](/use/registry) - Programmatically access server information
 - [Project Configuration](/build/project-config) - How to define server configuration in `smithery.yaml`
 - [JSON Schema Documentation](https://json-schema.org/understanding-json-schema/) - Learn more about JSON Schema

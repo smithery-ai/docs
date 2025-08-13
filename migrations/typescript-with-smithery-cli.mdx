@@ -3,10 +3,6 @@ title: "TypeScript with Smithery CLI"
 description: "Migrate your TypeScript MCP servers from STDIO to HTTP using Smithery CLI"
 ---
 
-# TypeScript with Smithery CLI
-
-This guide covers migrating TypeScript MCP servers that use the official MCP SDK from STDIO to HTTP transport using Smithery CLI.
-
 ## Overview
 
 For TypeScript projects, migration involves converting your server to export a function instead of connecting to transport directly. The Smithery CLI handles the HTTP transport automatically.
@@ -15,13 +11,14 @@ For TypeScript projects, migration involves converting your server to export a f
 
 ## What We're Building
 
-We'll build a simple stateless MCP server with a `greet` tool that:
-- Takes a user's name and returns a personalized greeting
+We'll build a simple stateless MCP server with a `count_characters` tool that:
+- Takes text input and counts occurrences of a specific character
 - Validates an API key from Smithery configuration to demonstrate secure configuration handling
+- Uses optional debug configuration for development
 - Uses Smithery CLI for automatic HTTP transport and containerization
 
 <Note>
-**Full Implementation**: For complete working examples with all dependencies and configuration files, check our [example repositories](https://github.com/smithery-ai/mcp-examples) on GitHub.
+**Full Implementation**: For the complete working character counter example with all dependencies and configuration files, see the [smithery-cookbook repository](https://github.com/smithery-ai/smithery-cookbook/blob/main/servers/typescript/typescript_quickstart/src/index.ts).
 </Note>
 
 ## Code Changes
@@ -32,30 +29,52 @@ We'll build a simple stateless MCP server with a `greet` tool that:
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-// Define configuration schema
+// Optional: Define configuration schema to require configuration at connection time
 export const configSchema = z.object({
-  apiKey: z.string().describe("Your API key")
+  apiKey: z.string().describe("Your API key"),
+  debug: z.boolean().default(false).describe("Enable debug logging"),
 });
 
-export default function ({ config }: { config: z.infer<typeof configSchema> }) {
+export default function createServer({
+  config,
+}: {
+  config: z.infer<typeof configSchema>;
+}) {
   const server = new McpServer({
-    name: "example-server",
+    name: "Character Counter",
     version: "1.0.0",
   });
 
-  // Add greet tool
-  server.tool("greet", "Greet someone by name", {
-    name: z.string().describe("Name to greet")
-  }, async ({ name }) => {
-    // Verify API key is provided
-    if (!config.apiKey) {
-      throw new Error("API key is required");
-    }
-    
-    return { content: [{ type: "text", text: `Hello, ${name}! (authenticated with ${config.apiKey.substring(0, 8)}...)` }] };
-  });
+  server.registerTool("count_characters", {
+    title: "Count Characters",
+    description: "Count occurrences of a specific character in text",
+    inputSchema: {
+      text: z.string().describe("The text to search in"),
+      character: z.string().describe("The character to count (single character)"),
+    },
+  },
+    async ({ text, character }) => {
+      // Verify API key is provided
+      if (!config.apiKey) {
+        throw new Error("API key is required");
+      }
+      
+      // Count occurrences of the specific character (case insensitive)
+      const count = text.toLowerCase().split(character.toLowerCase()).length - 1;
+      const debugInfo = config.debug ? ` (processed with API key ${config.apiKey.substring(0, 8)}...)` : "";
 
-  return server.server; // Export the server
+      return {
+        content: [
+          { 
+            type: "text", 
+            text: `The character "${character}" appears ${count} times in the text.${debugInfo}` 
+          }
+        ],
+      };
+    }
+  );
+
+  return server.server;
 }
 ```
 
