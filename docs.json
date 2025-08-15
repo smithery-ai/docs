@@ -54,7 +54,6 @@
 				"group": "Build MCP Servers",
 				"pages": [
 					"build/index",
-					"build/getting-started",
 					"build/deployments",
 					"build/session-config",
 					{
@@ -66,6 +65,15 @@
 						]
 					},
 					"build/permissions"
+				]
+			},
+			{
+				"group": "Migration Guides",
+				"pages": [
+					"migrations/stdio-to-http",
+					"migrations/typescript-with-smithery-cli",
+					"migrations/typescript-custom-container",
+					"migrations/python-custom-container"
 				]
 			},
 			{

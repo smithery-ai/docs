@@ -1,0 +1,46 @@
+---
+title: "Migrate STDIO to HTTP"
+description: "Complete guide for migrating your MCP servers to streamable HTTP transport, with 
+STDIO support for backwards compatibility"
+---
+
+## Why Migrate to HTTP?
+
+HTTP transport offers significant improvements over STDIO:
+
+- **20x Higher Concurrency**: Handle significantly more simultaneous requests
+- **Lower Latency**: Direct HTTP communication for faster response times  
+- **Better Resource Efficiency**: More efficient resource utilization
+- **Future-Proofing**: HTTP is the recommended remote transport in MCP specifications
+
+<Note>
+**Important**: Starting August 26th, 2025, Smithery will discontinue STDIO transport support for hosted servers. Please migrate to HTTP transport for continued service.
+</Note>
+
+## Migration Approaches
+
+Smithery supports two ways to host HTTP MCP servers. **Choose your migration approach below to get started with detailed step-by-step instructions.**
+
+<CardGroup cols={2}>
+  <Card
+    title="TypeScript with Smithery CLI"
+    icon="code"
+    href="/migrations/typescript-with-smithery-cli"
+  >
+    Automatic build and deployment for TypeScript projects with minimal configuration
+  </Card>
+  <Card
+    title="TypeScript Custom Container"
+    icon="code"
+    href="/migrations/typescript-custom-container"
+  >
+    Full Docker control for TypeScript projects with custom middleware and dependencies
+  </Card>
+  <Card
+    title="Python Custom Container"
+    icon="python"
+    href="/migrations/python-custom-container"
+  >
+    FastMCP with custom middleware for Python projects requiring full container control
+  </Card>
+</CardGroup>

@@ -1,0 +1,386 @@
+---
+title: "Python Custom Container"
+description: "Migrate your Python MCP servers to Streamable HTTP, with STDIO support for backwards cimpatibility"
+---
+
+## When to Use This Approach
+
+Choose Python custom containers when you:
+- Prefer to use Python for your MCP server (we hear you!)
+- Need full control over your Docker environment
+- Want to use FastMCP with custom middleware
+- Have specific Python dependencies or requirements
+
+<Card
+  title="Show me the repo"
+  icon="github"
+  href="https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/python/migrate_stdio_to_http/server_with_custom_container"
+>
+  View the fully runnable GitHub repo for this example
+</Card>
+
+## What We're Building
+
+We'll build a simple MCP server with a `count_characters` tool that:
+- Counts occurrences of a specific character in text
+- Extracts and validates Smithery session configuration (e.g., API key) - [see session config docs](https://smithery.ai/docs/build/session-config) for more details
+- Shows proper CORS handling and middleware setup
+- Supports both HTTP and STDIO transport
+
+## Code Migration
+
+<Info>
+**Already have HTTP support?** If your MCP server already supports HTTP transport, you can skip ahead to [Step 5: Update smithery.yaml](#step-5-update-smitheryyaml) to configure your deployment settings.
+</Info>
+
+### Let's say you start with this...
+
+Here's a typical STDIO-based MCP server that you might be starting with:
+
+```python
+# main.py
+import os
+from mcp.server.fastmcp import FastMCP
+
+# Create STDIO server
+mcp = FastMCP("Character Counter")
+
+# Get API key from environment variable
+api_key = os.getenv("API_KEY")
+
+@mcp.tool()
+def count_characters(text: str, character: str) -> str:
+    """Your tool implementation here..."""
+    # Tool logic with API key validation, etc.
+    pass
+
+# Run with STDIO transport
+if __name__ == "__main__":
+    mcp.run()
+```
+
+### Step 1: Update Imports and Setup
+
+Now let's migrate this to work as an HTTP container. Set up your FastMCP server with the necessary imports, configuration handling, and validation:
+
+```python
+# main.py
+import os
+import uvicorn
+from mcp.server.fastmcp import FastMCP
+from starlette.middleware.cors import CORSMiddleware
+from typing import Optional
+from middleware import SmitheryConfigMiddleware
+
+# Initialize MCP server
+mcp = FastMCP(name="Character Counter")
+
+def handle_config(config: dict):
+    """Handle configuration from Smithery - extract what we need."""
+    global current_api_key
+    if api_key := config.get('apiKey'):
+        current_api_key = api_key
+    # You can handle other session config fields here as defined in your `smithery.yaml`
+
+# Store API key from Smithery config
+current_api_key: Optional[str] = None
+
+def validate_api_key(api_key: Optional[str]) -> bool:
+    """Validate API key - accepts any string including empty ones for demo."""
+    # Add your own validation logic here
+    return True
+```
+
+<Note>
+**Configuration is Optional**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can remove all the config parsing middleware and validation code. The server will work perfectly fine without it.
+</Note>
+
+### Step 2: Register Tools
+
+Define your MCP tool:
+
+```python
+# main.py
+# MCP Tool - requires valid API key
+@mcp.tool()
+def count_characters(text: str, character: str) -> str:
+    """Count occurrences of a specific character in text"""
+    if not validate_api_key(current_api_key):
+        raise ValueError("API key validation failed.")
+    
+    # Count occurrences of the specific character (case insensitive)
+    count = text.lower().count(character.lower())
+    
+    return f'The character "{character}" appears {count} times in the text.'
+```
+
+### Step 3: Main Function and Server Startup
+
+Handle both HTTP and STDIO transport modes:
+
+```python
+# main.py
+def main():
+    transport_mode = os.getenv("TRANSPORT", "stdio")
+    
+    if transport_mode == "http":
+        # HTTP mode with config extraction from URL parameters
+        print("Character Counter MCP Server starting in HTTP mode...")
+        
+        # Setup Starlette app with CORS for cross-origin requests
+        app = mcp.streamable_http_app()
+        
+        # IMPORTANT: add CORS middleware for browser based clients
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["*"],
+            expose_headers=["mcp-session-id", "mcp-protocol-version"],
+            max_age=86400,
+        )
+
+        # Apply custom middleware for config extraction
+        app = SmitheryConfigMiddleware(app, handle_config)
+
+        # Get port from environment variable (defaults to 8080)
+        port = int(os.environ.get("PORT", 8080))
+        print(f"Listening on port {port}")
+
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level="debug")
+    
+    else:
+        # Optional: add stdio transport for backwards compatibility
+        # You can publish this to uv for users to run locally
+        print("Character Counter MCP Server starting in stdio mode...")
+        
+        api_key = os.getenv("API_KEY")
+        # Set the global API key for stdio mode (can be None)
+        handle_config({"apiKey": api_key})
+        
+        # Run with stdio transport (default)
+        mcp.run()
+
+if __name__ == "__main__":
+    main()
+```
+
+### Step 4: Create Middleware Setup
+
+Create the middleware for handling Smithery configuration:
+
+```python
+# middleware/__init__.py
+import json
+import base64
+from urllib.parse import parse_qs, unquote
+
+class SmitheryConfigMiddleware:
+    def __init__(self, app, config_callback):
+        self.app = app
+        self.config_callback = config_callback
+
+    async def __call__(self, scope, receive, send):
+        if scope.get('type') == 'http':
+            query = scope.get('query_string', b'').decode()
+            
+            if 'config=' in query:
+                try:
+                    config_b64 = unquote(parse_qs(query)['config'][0])
+                    config = json.loads(base64.b64decode(config_b64))
+                    self.config_callback(config)
+                    print(f"SmitheryConfigMiddleware: Extracted config: {list(config.keys())}")
+                except Exception as e:
+                    print(f"SmitheryConfigMiddleware: Error parsing config: {e}")
+        await self.app(scope, receive, send)
+```
+
+This middleware:
+- Extracts base64-encoded configuration from URL query parameters
+- Decodes and parses the JSON configuration
+- Calls your config callback function to handle the extracted config
+- Provides error handling and logging for debugging
+
+## Configuration Changes
+
+### Step 5: Update smithery.yaml
+
+<CodeGroup>
+
+```yaml Before (STDIO)
+# smithery.yaml
+startCommand:
+  type: stdio
+  commandFunction: |
+    (config) => ({
+      command: 'python',
+      args: ['server.py'],
+      env: {
+        API_KEY: config.apiKey
+      }
+    })
+  configSchema:
+    type: object
+    required: [apiKey]
+    properties:
+      apiKey:
+        type: string
+        description: Your API key
+  exampleConfig:
+    apiKey: "sk-example-123"
+```
+
+```yaml After (HTTP Container)
+# smithery.yaml
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"           # Path to your Dockerfile
+  dockerBuildPath: "."               # Docker build context
+startCommand:
+  type: "http"
+  configSchema:                      # Optional: Define configuration schema
+    type: object
+    required: [apiKey]
+    properties:
+      apiKey:
+        type: string
+        description: Your API key
+  exampleConfig:                     # Optional: Example configuration
+    apiKey: "sk-example-123"
+```
+
+</CodeGroup>
+
+### Step 6: Update Dockerfile
+
+You can create your own Dockerfile or use this recommended template:
+
+<CodeGroup>
+
+```dockerfile Before (STDIO)
+# Dockerfile
+# Use a Python image with uv pre-installed
+FROM ghcr.io/astral-sh/uv:python3.12-alpine
+
+# Install the project into `/app`
+WORKDIR /app
+
+# Enable bytecode compilation
+ENV UV_COMPILE_BYTECODE=1
+
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
+
+# Install the project's dependencies using the lockfile and settings
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-dev
+
+# Then, add the rest of the project source code and install it
+COPY . /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev
+
+# Place executables in the environment at the front of the path
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Reset the entrypoint, don't invoke `uv`
+ENTRYPOINT []
+
+# STDIO servers don't expose ports
+CMD ["python", "main.py"]
+```
+
+```dockerfile After (HTTP Container)
+# Dockerfile
+# Use a Python image with uv pre-installed
+FROM ghcr.io/astral-sh/uv:python3.12-alpine
+
+# Install the project into `/app`
+WORKDIR /app
+
+# Enable bytecode compilation
+ENV UV_COMPILE_BYTECODE=1
+
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
+
+# Install the project's dependencies using the lockfile and settings
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-dev
+
+# Then, add the rest of the project source code and install it
+# Installing separately from its dependencies allows optimal layer caching
+COPY . /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev
+
+# Place executables in the environment at the front of the path
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Set transport mode to HTTP and port to 8080 as required by Smithery proxy
+ENV TRANSPORT=http
+ENV PORT=8080
+EXPOSE 8080
+
+# Reset the entrypoint, don't invoke `uv`
+ENTRYPOINT []
+
+# Run the application directly using the venv Python
+CMD ["python", "main.py"]
+```
+
+</CodeGroup>
+
+<Note>
+**uv Docker Best Practices**: For more examples and best practices on using uv with Docker, including multistage builds and development workflows, check out the [uv Docker example repository](https://github.com/astral-sh/uv-docker-example).
+</Note>
+
+
+
+## Local Testing
+
+1. **Run directly with Python:**
+   ```bash
+   # Install dependencies
+   uv sync
+   
+   # Run in HTTP mode
+   TRANSPORT=http uv run python main.py
+   ```
+
+2. **Or with Docker:**
+   ```bash
+   docker build -t character-counter .
+   docker run -p 8080:8080 -e PORT=8080 character-counter
+   ```
+
+3. **Test interactively:**
+   Once your server is running in HTTP mode, you can test it interactively using the Smithery playground:
+   ```bash
+   npx @smithery/cli playground --port 8080
+   ```
+
+   <Note>
+   **Config Handling Limitation**: The Smithery playground doesn't currently support config handling for custom containers (Python/TypeScript). Your deployed server will support configuration, but local testing with the playground will use default/empty config values. We're actively working on adding this support.
+   </Note>
+
+## Deployment
+
+1. **Push Code**: Push your updated code (including `Dockerfile` and `smithery.yaml`) to GitHub
+2. **Deploy**: Go to [smithery.ai/new](https://smithery.ai/new) and connect your GitHub repository
+3. **Verify**: Test your deployed server through the Smithery interface
+
+Smithery will automatically build your container and host your MCP server.
+
+## Summary
+
+This guide showed how to migrated a Python MCP server from STDIO to HTTP transport using custom Docker containers and FastMCP. We implemented a character counter tool with proper CORS configuration, used SmitheryConfigMiddleware for configuration handling, and supported both HTTP and STDIO transport modes. This approach gives us full control over our Python environment and middleware while maintaining backward compatibility.
+
+---
+
+**Need help?** Join our [Discord](https://discord.gg/Afd38S5p9A) or email [support@smithery.ai](mailto:support@smithery.ai) for assistance.
