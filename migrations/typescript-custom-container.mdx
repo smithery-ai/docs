@@ -11,59 +11,83 @@ Choose TypeScript custom containers when you:
 - Want to implement HTTP transport manually
 - Need specific middleware or custom server logic
 
+<Card
+  title="Show me the repo"
+  icon="github"
+  href="https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/typescript/migrate_stdio_to_http/server_with_custom_container"
+>
+  View the fully runnable GitHub repo for this example
+</Card>
+
 <Note>
 **Alternative**: If you're using the official MCP SDK and want automatic deployment, consider [TypeScript with Smithery CLI](/migrations/typescript-with-smithery-cli) instead.
 </Note>
 
 ## What We're Building
 
-We'll build a simple stateless MCP server with a `count_characters` tool that:
-- Counts occurrences of a specific character in text
-- Validates an API key from Smithery configuration  
-- Shows proper CORS handling and middleware setup
-- Supports both HTTP and STDIO transport modes
-
-<Note>
-**Full Implementation**: For complete working examples with all dependencies and configuration files, check our [example repositories](https://github.com/smithery-ai/mcp-examples) on GitHub.
-</Note>
+We'll build a simple MCP server with a `count_characters` tool that:
+- Takes text input and counts occurrences of a specific character
+- Validates an API key from Smithery configuration to demonstrate configuration handling
+- Uses custom Express server with full Docker control
+- Supports both HTTP and STDIO transport
 
 ## Code Migration
 
-<CodeGroup>
+<Note>
+**Already have HTTP support?** If your MCP server already supports HTTP transport, you can skip ahead to [Step 5: Update smithery.yaml](#step-5-update-smitheryyaml) to configure your deployment settings.
+</Note>
 
-```typescript Before (STDIO)
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+### Let's say you start with this...
+
+Here's a typical STDIO-based MCP server that you might be starting with:
+
+```typescript
+// src/index.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-const server = new Server({
-  name: "example-server",
+// Create STDIO server
+const server = new McpServer({
+  name: "Character Counter",
   version: "1.0.0"
-}, {
-  capabilities: { tools: {} }
 });
 
-// Add your tools
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools: [...] };
+// Get API key from environment variable
+const apiKey = process.env.API_KEY;
+
+// Register tool
+server.registerTool("count_characters", {
+  description: "Count occurrences of a specific character in text",
+  inputSchema: {
+    text: { type: "string", description: "The text to search in" },
+    character: { type: "string", description: "The character to count" }
+  }
+}, async ({ text, character }) => {
+  // Tool implementation with API key validation, etc.
+  // ...
 });
 
-// STDIO transport
+// Run with STDIO transport
 const transport = new StdioServerTransport();
-await server.connect(transport);
+await server.server.connect(transport);
 ```
 
-```typescript After (HTTP Container)
+### Step 1: Update Imports and Setup Express Server
+
+Now let's migrate this to work with custom HTTP containers. First, set up your Express server with the necessary imports and middleware:
+
+```typescript
+// src/index.ts
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { logging } from "./middleware.js";
 
-// Optional: Define configuration schema to require configuration at connection time
+// Define session configuration schema
 export const configSchema = z.object({
-  apiKey: z.string().optional().describe("Your API key"),
+  apiKey: z.string().describe("Your API key"), // for demonstration
 });
 
 const app = express();
@@ -78,9 +102,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// (Optional) simple middleware for logging
-app.use(logging);
-
 // Parse configuration from query parameters
 function parseConfig(req: Request) {
   const configParam = req.query.config as string;
@@ -92,22 +113,21 @@ function parseConfig(req: Request) {
 
 function validateApiKey(apiKey?: string): boolean {
   // Validate API key - accepts any string including empty ones for demo
-  // TODO: Add your own validation logic here as needed
+  // Add your own validation logic here
   return true;
 }
 ```
-
-</CodeGroup>
 
 <Note>
 **Configuration is Optional**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can remove all the config parsing and validation code. The server will work perfectly fine without it.
 </Note>
 
-## Server Creation and Tool Registration
+### Step 2: Create Server Function and Register Tools
 
-Create your MCP server and register your tools:
+Create the server function and register your tools:
 
 ```typescript
+// src/index.ts
 // Create MCP server with your tools
 export default function createServer({
   config,
@@ -119,7 +139,7 @@ export default function createServer({
     version: "1.0.0",
   });
 
-  server.registerTool( "count_characters", {
+  server.registerTool("count_characters", {
     title: "Count Characters",
     description: "Count occurrences of a specific character in text",
     inputSchema: {
@@ -128,7 +148,7 @@ export default function createServer({
     },
   },
     async ({ text, character }) => {
-      // Validate API key (lenient validation for demo)
+      // Validate API key
       if (!validateApiKey(config.apiKey)) {
         throw new Error("API key validation failed");
       }
@@ -151,11 +171,12 @@ export default function createServer({
 }
 ```
 
-## MCP Request Handler
+### Step 3: MCP Request Handler
 
 Handle incoming MCP requests at the `/mcp` endpoint:
 
 ```typescript
+// src/index.ts
 // Handle MCP requests at /mcp endpoint
 app.all('/mcp', async (req: Request, res: Response) => {
   try {
@@ -164,7 +185,6 @@ app.all('/mcp', async (req: Request, res: Response) => {
     // Validate and parse configuration
     const config = configSchema.parse({
       apiKey: rawConfig.apiKey || process.env.API_KEY || undefined,
-      debug: rawConfig.debug || process.env.DEBUG === "true",
     });
     
     const server = createServer({ config });
@@ -193,20 +213,25 @@ app.all('/mcp', async (req: Request, res: Response) => {
 });
 ```
 
-## Main Function and Server Startup
+### Step 4: Maintaining STDIO Compatibility (Optional)
 
-Start your server in either HTTP or STDIO mode:
+Now that we have our HTTP server ready, we can optionally add STDIO support for backward compatibility. This gives you the best of both worlds:
+
+- **HTTP deployment**: Custom Express server with full control for scalable HTTP deployment
+- **Local development**: Keep the familiar STDIO transport for backwards compatibility
+- **NPM distribution**: Publish your server so others can install and run it locally
+
+To enable STDIO support, add a `main()` function:
 
 ```typescript
-// Main function to start the server in the appropriate mode
+// src/index.ts
 async function main() {
   const transport = process.env.TRANSPORT || 'http';
   
   if (transport === 'stdio') {
-    // Run in stdio mode
-    const apiKey = process.env.API_KEY;
-    // API key optional for demo
-
+    // Check if API key is provided
+    const apiKey = process.env.API_KEY || "";
+    
     // Create server with configuration
     const server = createServer({
       config: {
@@ -214,7 +239,6 @@ async function main() {
       },
     });
 
-    // Start receiving messages on stdin and sending messages on stdout
     const stdioTransport = new StdioServerTransport();
     await server.connect(stdioTransport);
     console.error("MCP Server running in stdio mode");
@@ -226,16 +250,20 @@ async function main() {
   }
 }
 
-// Start the server
+// By default run the server with HTTP transport
 main().catch((error) => {
   console.error("Server error:", error);
   process.exit(1);
 });
 ```
 
+<Note>
+**How it works**: When you deploy with custom containers, your Express server handles HTTP requests at the `/mcp` endpoint. The `main()` function only runs STDIO mode when you execute the file directly (like `node dist/index.js`), giving you STDIO support for local development.
+</Note>
+
 ## Configuration Changes
 
-### Update smithery.yaml
+### Step 5: Update smithery.yaml
 
 <CodeGroup>
 
@@ -281,39 +309,52 @@ startCommand:
 
 </CodeGroup>
 
-### Update Dockerfile
+### Step 6: Update Dockerfile
 
 <CodeGroup>
 
 ```dockerfile Before (STDIO)
-FROM node:18-slim
+FROM node:22-slim
 
 WORKDIR /app
+
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm ci --only=production
+
+# Copy source code
 COPY . .
+
+# Build TypeScript code
 RUN npm run build
 
 # STDIO servers don't expose ports
 CMD ["node", "dist/index.js"]
 ```
 
-```dockerfile (HTTP Container)
+```dockerfile After (HTTP Container)
 FROM node:22-slim
 
 # Set working directory
 WORKDIR /app
 
-# Copy source code
-COPY . .
+# Copy package files
+COPY package*.json ./
 
 # Install all dependencies (need dev deps for TypeScript compilation)
 RUN npm ci
 
+# Copy source code
+COPY . .
+
 # Build the TypeScript code
 RUN npm run build
 
-# Expose port
+# Set transport mode to HTTP and port to 8080 as required by Smithery proxy
+ENV TRANSPORT=http
+ENV PORT=8080
 EXPOSE 8080
 
 # Start the server directly with node
@@ -322,7 +363,9 @@ CMD ["node", "dist/index.js"]
 
 </CodeGroup>
 
-### package.json
+### Step 7: Update package.json
+
+Configure `package.json` for both HTTP and STDIO workflows:
 
 ```json
 {

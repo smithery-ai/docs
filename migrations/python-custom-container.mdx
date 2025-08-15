@@ -11,6 +11,14 @@ Choose Python custom containers when you:
 - Want to use FastMCP with custom middleware
 - Have specific Python dependencies or requirements
 
+<Card
+  title="Show me the repo"
+  icon="github"
+  href="https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/python/migrate_stdio_to_http/server_with_custom_container"
+>
+  View the fully runnable GitHub repo for this example
+</Card>
+
 ## What We're Building
 
 We'll build a simple MCP server with a `count_characters` tool that:
@@ -19,11 +27,11 @@ We'll build a simple MCP server with a `count_characters` tool that:
 - Shows proper CORS handling and middleware setup
 - Supports both HTTP and STDIO transport
 
-<Note>
-**Full Implementation**: For the complete working character counter example with all dependencies and configuration files, see the [smithery-cookbook repository](https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/python/migrate_stdio_to_http).
-</Note>
-
 ## Code Migration
+
+<Note>
+**Already have HTTP support?** If your MCP server already supports HTTP transport, you can skip ahead to [Step 5: Update smithery.yaml](#step-5-update-smitheryyaml) to configure your deployment settings.
+</Note>
 
 ### Let's say you start with this...
 
