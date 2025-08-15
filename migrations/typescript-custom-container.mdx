@@ -207,22 +207,26 @@ RUN npm run build
 CMD ["node", "dist/index.js"]
 ```
 
-```dockerfile After (HTTP Container)
-FROM node:18-slim
+```dockerfile (HTTP Container)
+FROM node:22-slim
 
+# Set working directory
 WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-RUN npm ci --only=production
 
 # Copy source code
 COPY . .
+
+# Install all dependencies (need dev deps for TypeScript compilation)
+RUN npm ci
+
+# Build the TypeScript code
 RUN npm run build
 
-# HTTP servers must expose the port
+# Expose port
 EXPOSE 8000
-CMD ["node", "dist/server.js"]
+
+# Start the server directly with node
+CMD ["node", "dist/index.js"]
 ```
 
 </CodeGroup>

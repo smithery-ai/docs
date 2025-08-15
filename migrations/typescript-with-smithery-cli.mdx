@@ -5,80 +5,25 @@ description: "Migrate your TypeScript MCP servers from STDIO to HTTP using Smith
 
 ## Overview
 
-For TypeScript projects, migration involves converting your server to export a function instead of connecting to transport directly. The Smithery CLI handles the HTTP transport automatically.
-
-**Entry Point**: This is your main server file (can be `src/index.ts`, `src/server.ts`, or any filename). This file must export your MCP server so Smithery CLI can build and deploy it.
+Migration involves creating a file that exports an MCP server object using the official McpServer from "@modelcontextprotocol/sdk/server/mcp.js". This main server file (can be `src/index.ts`, `src/server.ts`, or any filename) must export your MCP server so the Smithery CLI can build and deploy it to run over HTTP. You specify which file to use by setting the `module` field in your `package.json`.
 
 ## What We're Building
 
-We'll build a simple stateless MCP server with a `count_characters` tool that:
+We'll build a simple MCP server with a `count_characters` tool that:
 - Takes text input and counts occurrences of a specific character
-- Validates an API key from Smithery configuration to demonstrate secure configuration handling
-- Uses optional debug configuration for development
-- Uses Smithery CLI for automatic HTTP transport and containerization
+- Validates an API key from Smithery configuration to demonstrate configuration handling
+- Uses Smithery CLI for building the server and containerization
 
 <Note>
-**Full Implementation**: For the complete working character counter example with all dependencies and configuration files, see the [smithery-cookbook repository](https://github.com/smithery-ai/smithery-cookbook/blob/main/servers/typescript/typescript_quickstart/src/index.ts).
+**Full Implementation**: For the complete working character counter example with all dependencies and configuration files, see the [smithery-cookbook repository](https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/typescript/migrate_stdio_to_http/server_with_smithery_cli).
 </Note>
 
 ## Code Changes
 
 <CodeGroup>
 
-```typescript After (HTTP)
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-
-// Optional: Define configuration schema to require configuration at connection time
-export const configSchema = z.object({
-  apiKey: z.string().describe("Your API key"),
-  debug: z.boolean().default(false).describe("Enable debug logging"),
-});
-
-export default function createServer({
-  config,
-}: {
-  config: z.infer<typeof configSchema>;
-}) {
-  const server = new McpServer({
-    name: "Character Counter",
-    version: "1.0.0",
-  });
-
-  server.registerTool("count_characters", {
-    title: "Count Characters",
-    description: "Count occurrences of a specific character in text",
-    inputSchema: {
-      text: z.string().describe("The text to search in"),
-      character: z.string().describe("The character to count (single character)"),
-    },
-  },
-    async ({ text, character }) => {
-      // Verify API key is provided
-      if (!config.apiKey) {
-        throw new Error("API key is required");
-      }
-      
-      // Count occurrences of the specific character (case insensitive)
-      const count = text.toLowerCase().split(character.toLowerCase()).length - 1;
-      const debugInfo = config.debug ? ` (processed with API key ${config.apiKey.substring(0, 8)}...)` : "";
-
-      return {
-        content: [
-          { 
-            type: "text", 
-            text: `The character "${character}" appears ${count} times in the text.${debugInfo}` 
-          }
-        ],
-      };
-    }
-  );
-
-  return server.server;
-}
-```
-
 ```typescript Before (STDIO)
+// src/index.ts
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
@@ -99,13 +44,108 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 ```
 
+```typescript After (HTTP)
+// src/index.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+// Optional: Define session configuration for server
+export const configSchema = z.object({
+  apiKey: z.string().describe("Your API key"), // for demonstration
+});
+
+export default function createServer({
+  config,
+}: {
+  config: z.infer<typeof configSchema>;
+}) {
+  const server = new McpServer({
+    name: "Character Counter",
+    version: "1.0.0",
+  });
+
+  server.registerTool( "count_characters", {
+    title: "Count Characters",
+    description: "Count occurrences of a specific character in text",
+    inputSchema: {
+      text: z.string().describe("The text to search in"),
+      character: z.string().describe("The character to count (single character)"),
+    },
+  },
+    async ({ text, character }) => {
+      // Verify API key is provided
+      if (!config.apiKey) {
+        throw new Error("API key is required");
+      }
+      
+      // Count occurrences of the specific character (case insensitive)
+      const count = text.toLowerCase().split(character.toLowerCase()).length - 1;
+
+      return {
+        content: [
+          { 
+            type: "text", 
+            text: `The character "${character}" appears ${count} times in the text.` 
+          }
+        ],
+      };
+    }
+  );
+
+  return server.server;
+}
+```
+
 </CodeGroup>
+
+## Maintaining STDIO Compatibility (Optional)
+
+You can maintain backward compatibility with STDIO transport while supporting HTTP through Smithery CLI. This approach allows you to:
+
+- **Export for Smithery CLI**: The exported `createServer` function is used by Smithery CLI for HTTP deployment
+- **Keep STDIO support**: The `main()` function maintains STDIO transport for local development or direct usage
+- **Publish to npm**: Users can install and run your server locally with STDIO transport
+
+Add this code to the bottom of your file for STDIO compatibility:
+
+```typescript
+async function main() {
+  // Check if API key is provided
+  const apiKey = process.env.API_KEY || "";
+  
+  // Create server with configuration
+  const server = createServer({
+    config: {
+      apiKey,
+    },
+  });
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+// By default the server with stdio transport
+main().catch((error) => {
+  console.error("Server error:", error);
+  process.exit(1);
+});
+```
+
+To run with STDIO transport locally (after building):
+
+```bash
+npm run build
+node dist/index.js
+```
+
+When deployed with Smithery CLI, only the exported `createServer` function is used, and the `main()` function is ignored.
 
 ## Configuration Changes
 
 ### Update package.json
 
-Configure `package.json` so Smithery CLI can find your exported server:
+Configure `package.json` so Smithery CLI can find your exported server and add scripts for both HTTP and STDIO workflows:
 
 ```json
 {
@@ -114,23 +154,37 @@ Configure `package.json` so Smithery CLI can find your exported server:
   "type": "module",
   "module": "src/index.ts", // [!code highlight]
   "scripts": {
-    "build": "npx @smithery/cli build", // [!code highlight]
-    "dev": "npx @smithery/cli dev" // [!code highlight]
+    "dev": "npx @smithery/cli dev",
+    "build": "npm run build:http",
+    "build:stdio": "tsc",
+    "build:http": "npx @smithery/cli build",
+    "start": "npm run start:http",
+    "start:http": "node .smithery/index.cjs",
+    "start:stdio": "node dist/index.js",
+    "prepublishOnly": "npm run build:stdio"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.11.0",
-    "zod": "^3.25.0"
+    "@modelcontextprotocol/sdk": "^1.17.3",
+    "zod": "^4.0.17"
   }
 }
 ```
 
+**Important**: The `module` field tells Smithery CLI where to find your exported server function.
+
+**Script explanations:**
+- `dev`: Start development server with interactive playground
+- `build`: Build for production (defaults to HTTP)
+- `build:stdio`: Compile TypeScript for STDIO usage
+- `build:http`: Build for Smithery HTTP deployment
+- `start`: Start production server (defaults to HTTP)
+- `start:http`: Run the Smithery-built HTTP server
+- `start:stdio`: Run the compiled STDIO version locally
+- `prepublishOnly`: Ensure STDIO build before publishing to npm
+
 ### Update smithery.yaml
 
 <CodeGroup>
-
-```yaml After (HTTP)
-runtime: "typescript"
-```
 
 ```yaml Before (STDIO)
 startCommand:
@@ -152,6 +206,10 @@ startCommand:
         description: Your API key
   exampleConfig:
     apiKey: "sk-example-123"
+```
+
+```yaml After (HTTP)
+runtime: "typescript"
 ```
 
 </CodeGroup>
@@ -194,13 +252,9 @@ This compiles your TypeScript code and prepares it for deployment on Smithery.
 
 The TypeScript runtime handles HTTP transport automatically - no additional configuration needed.
 
-## Key Changes Summary
+## Summary
 
-1. **Export Function**: Export a default function that returns `server.server`
-2. **Configuration Schema**: Export `configSchema` using Zod for type safety
-3. **Package.json Module Field**: Set `module` field to point to your server export file
-4. **Runtime Configuration**: Set `runtime: "typescript"` in `smithery.yaml`
-5. **Remove Transport Code**: Smithery CLI handles HTTP transport automatically
+This guide showed you how to build a simple TypeScript MCP server that exports a default function using the official `McpServer` from the SDK, configure session handling with Zod, and set up your `package.json` module field so Smithery CLI can find your server. This supports both HTTP deployment through Smithery CLI and optional STDIO backward compatibility, with build scripts for both workflows.
 
 ---
 
