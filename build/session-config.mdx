@@ -107,6 +107,55 @@ print(config)  # {'server': {'host': 'localhost', 'port': 8080}, 'debug': True}
 
 </CodeGroup>
 
+### Using Configuration in Your Server
+
+Once you've parsed the configuration, you can use these values throughout your MCP server:
+
+<CodeGroup>
+
+```typescript TypeScript
+// Example: Using config in an MCP tool
+server.registerTool("query_database", {
+  description: "Query the database with user's connection",
+  inputSchema: {
+    query: { type: "string", description: "SQL query to execute" }
+  }
+}, async ({ query }, { request }) => {
+  const config = parseConfig(request);
+  
+  // Use configuration values
+  const dbUrl = config.connectionString;
+  const maxResults = config.maxResults || 10;
+  const apiKey = config.openaiApiKey;
+  
+  // Connect to user's specific database
+  const connection = await connectToDatabase(dbUrl);
+  const results = await connection.query(query, { limit: maxResults });
+  
+  return {
+    content: [{ type: "text", text: JSON.stringify(results) }]
+  };
+});
+```
+
+```python Python
+@mcp.tool()
+def query_database(query: str) -> str:
+    """Query the database with user's connection"""
+    # Access the parsed config (stored globally or passed to tool)
+    db_url = current_config.get('connectionString')
+    max_results = current_config.get('maxResults', 10)
+    api_key = current_config.get('openaiApiKey')
+    
+    # Use configuration values in your tool logic
+    connection = connect_to_database(db_url)
+    results = connection.query(query, limit=max_results)
+    
+    return json.dumps(results)
+```
+
+</CodeGroup>
+
 
 
 ## Examples
