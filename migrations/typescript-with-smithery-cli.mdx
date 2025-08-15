@@ -3,9 +3,14 @@ title: "TypeScript with Smithery CLI"
 description: "Migrate your TypeScript MCP servers from STDIO to HTTP using Smithery CLI"
 ---
 
-## Overview
+## When to Use This Approach
 
-Migration involves creating a file that exports an MCP server object using the official McpServer from "@modelcontextprotocol/sdk/server/mcp.js". This main server file (can be `src/index.ts`, `src/server.ts`, or any filename) must export your MCP server so the Smithery CLI can build and deploy it to run over HTTP. You specify which file to use by setting the `module` field in your `package.json`.
+Choose TypeScript with Smithery CLI when you:
+- Want the simplest migration path from STDIO to HTTP
+- Are using the official MCP SDK and don't need custom middleware
+- Prefer automatic containerization and deployment
+- Want to maintain backward compatibility with STDIO transport
+- Need a fully featured interactive development playground for testing
 
 ## What We're Building
 
@@ -165,7 +170,7 @@ Configure `package.json` so Smithery CLI can find your exported server and add s
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.3",
-    "zod": "^4.0.17"
+    "zod": "^3.25.46"
   }
 }
 ```
