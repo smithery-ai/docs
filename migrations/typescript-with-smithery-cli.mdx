@@ -1,6 +1,6 @@
 ---
 title: "TypeScript with Smithery CLI"
-description: "Migrate your TypeScript MCP servers from STDIO to HTTP using Smithery CLI"
+description: "Migrate your TypeScript MCP servers to Streamable HTTP, with STDIO support for backwards compatibility"
 ---
 
 ## When to Use This Approach
@@ -8,9 +8,17 @@ description: "Migrate your TypeScript MCP servers from STDIO to HTTP using Smith
 Choose TypeScript with Smithery CLI when you:
 - Want the simplest migration path from STDIO to HTTP
 - Are using the official MCP SDK and don't need custom middleware
-- Prefer automatic containerization and deployment
+- Want Smithery to handle containerization and deployment
 - Want to maintain backward compatibility with STDIO transport
 - Need a fully featured interactive development playground for testing
+
+<Card
+  title="Show me the repo"
+  icon="github"
+  href="https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/typescript/migrate_stdio_to_http/server_with_smithery_cli"
+>
+  View the fully runnable GitHub repo for this example
+</Card>
 
 ## What We're Building
 
@@ -18,48 +26,79 @@ We'll build a simple MCP server with a `count_characters` tool that:
 - Takes text input and counts occurrences of a specific character
 - Validates an API key from Smithery configuration to demonstrate configuration handling
 - Uses Smithery CLI for building the server and containerization
+- Supports both HTTP and STDIO transport
 
-<Note>
-**Full Implementation**: For the complete working character counter example with all dependencies and configuration files, see the [smithery-cookbook repository](https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/typescript/migrate_stdio_to_http/server_with_smithery_cli).
-</Note>
 
-## Code Changes
 
-<CodeGroup>
+## Code Migration
 
-```typescript Before (STDIO)
+### Let's say you start with this...
+
+Here's a typical STDIO-based MCP server that you might be starting with:
+
+```typescript
 // src/index.ts
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-const server = new Server({
-  name: "example-server",
+// Create STDIO server
+const server = new McpServer({
+  name: "Character Counter",
   version: "1.0.0"
-}, {
-  capabilities: { tools: {} }
 });
 
-// Add your tools
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools: [...] };
+// Get API key from environment variable
+const apiKey = process.env.API_KEY;
+
+// Register tool
+server.registerTool("count_characters", {
+  description: "Count occurrences of a specific character in text",
+  inputSchema: {
+    text: { type: "string", description: "The text to search in" },
+    character: { type: "string", description: "The character to count" }
+  }
+}, async ({ text, character }) => {
+  // Tool implementation with API key validation, etc.
+  // ...
 });
 
-// STDIO transport
+// Run with STDIO transport
 const transport = new StdioServerTransport();
-await server.connect(transport);
+await server.server.connect(transport);
 ```
 
-```typescript After (HTTP)
+### Step 1: Update Imports and Configuration Schema
+
+Now let's migrate this to work with Smithery CLI. First, update your imports and define your configuration schema:
+
+```typescript
 // src/index.ts
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-// Optional: Define session configuration for server
+// Define session configuration schema
 export const configSchema = z.object({
   apiKey: z.string().describe("Your API key"), // for demonstration
 });
 
+function validateApiKey(apiKey?: string): boolean {
+  // Validate API key - accepts any string including empty ones for demo
+  // Add your own validation logic here
+  return true;
+}
+```
+
+<Note>
+**Configuration is Optional**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can remove all the config schema and validation code. The server will work perfectly fine without it.
+</Note>
+
+### Step 2: Create Server Function and Register Tools
+
+Create the exported server function that Smithery CLI will use:
+
+```typescript
+// src/index.ts
 export default function createServer({
   config,
 }: {
@@ -70,7 +109,7 @@ export default function createServer({
     version: "1.0.0",
   });
 
-  server.registerTool( "count_characters", {
+  server.registerTool("count_characters", {
     title: "Count Characters",
     description: "Count occurrences of a specific character in text",
     inputSchema: {
@@ -79,9 +118,9 @@ export default function createServer({
     },
   },
     async ({ text, character }) => {
-      // Verify API key is provided
-      if (!config.apiKey) {
-        throw new Error("API key is required");
+      // Validate API key
+      if (!validateApiKey(config.apiKey)) {
+        throw new Error("API key validation failed");
       }
       
       // Count occurrences of the specific character (case insensitive)
@@ -102,19 +141,18 @@ export default function createServer({
 }
 ```
 
-</CodeGroup>
+### Step 3: Maintaining STDIO Compatibility (Optional)
 
-## Maintaining STDIO Compatibility (Optional)
+Now that we have our `createServer` function ready for Smithery CLI, we can optionally add STDIO support for backward compatibility. This gives you the best of both worlds:
 
-You can maintain backward compatibility with STDIO transport while supporting HTTP through Smithery CLI. This approach allows you to:
+- **HTTP deployment**: Smithery CLI uses your exported `createServer` function for scalable HTTP deployment
+- **Local development**: Keep the familiar STDIO transport for backwards compatibility
+- **NPM distribution**: Publish your server so others can install and run it locally
 
-- **Export for Smithery CLI**: The exported `createServer` function is used by Smithery CLI for HTTP deployment
-- **Keep STDIO support**: The `main()` function maintains STDIO transport for local development or direct usage
-- **Publish to npm**: Users can install and run your server locally with STDIO transport
-
-Add this code to the bottom of your file for STDIO compatibility:
+To enable STDIO support, add a `main()` function at the bottom of your file:
 
 ```typescript
+// src/index.ts
 async function main() {
   // Check if API key is provided
   const apiKey = process.env.API_KEY || "";
@@ -128,27 +166,23 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  console.error("MCP Server running in stdio mode");
 }
 
-// By default the server with stdio transport
+// By default run the server with stdio transport
 main().catch((error) => {
   console.error("Server error:", error);
   process.exit(1);
 });
 ```
 
-To run with STDIO transport locally (after building):
-
-```bash
-npm run build
-node dist/index.js
-```
-
-When deployed with Smithery CLI, only the exported `createServer` function is used, and the `main()` function is ignored.
+<Note>
+**How it works**: When you deploy with Smithery CLI, it imports and uses your exported `createServer` function for HTTP transport. The `main()` function only runs when you execute the file directly (like `node dist/index.js`), giving you STDIO support for local development.
+</Note>
 
 ## Configuration Changes
 
-### Update package.json
+### Step 4: Update package.json
 
 Configure `package.json` so Smithery CLI can find your exported server and add scripts for both HTTP and STDIO workflows:
 
@@ -162,7 +196,7 @@ Configure `package.json` so Smithery CLI can find your exported server and add s
     "dev": "npx @smithery/cli dev",
     "build": "npm run build:http",
     "build:stdio": "tsc",
-    "build:http": "npx @smithery/cli build",
+    "build:http": "npx @smithery/cli build", // [!code highlight]
     "start": "npm run start:http",
     "start:http": "node .smithery/index.cjs",
     "start:stdio": "node dist/index.js",
@@ -187,7 +221,7 @@ Configure `package.json` so Smithery CLI can find your exported server and add s
 - `start:stdio`: Run the compiled STDIO version locally
 - `prepublishOnly`: Ensure STDIO build before publishing to npm
 
-### Update smithery.yaml
+### Step 5: Update smithery.yaml
 
 <CodeGroup>
 
@@ -227,27 +261,34 @@ That's it! The Smithery CLI handles the HTTP transport automatically.
 
 ## Local Testing
 
-### Using Smithery Interactive Playground
+1. **Using Smithery Interactive Playground:**
+   ```bash
+   # Start development server with interactive playground
+   npm run dev
+   ```
+   
+   The `npm run dev` command opens the **Smithery interactive playground** where you can:
+   - Test your MCP server tools in real-time
+   - See tool responses and debug issues
+   - Validate your configuration schema
+   - Experiment with different inputs
 
-```bash
-# Start development server with interactive playground
-npm run dev
-```
+2. **Building for Production:**
+   ```bash
+   # Build your server for deployment
+   npm run build
+   ```
+   
+   This compiles your TypeScript code and prepares it for deployment on Smithery.
 
-The `npm run dev` command opens the **Smithery interactive playground** where you can:
-- Test your MCP server tools in real-time
-- See tool responses and debug issues
-- Validate your configuration schema
-- Experiment with different inputs
-
-### Building for Production
-
-```bash
-# Build your server for deployment
-npm run build
-```
-
-This compiles your TypeScript code and prepares it for deployment on Smithery.
+3. **Testing STDIO mode locally:**
+   ```bash
+   # Build TypeScript code
+   npm run build:stdio
+   
+   # Run in STDIO mode
+   API_KEY=your-api-key npm run start:stdio
+   ```
 
 ## Deployment
 
@@ -259,7 +300,7 @@ The TypeScript runtime handles HTTP transport automatically - no additional conf
 
 ## Summary
 
-This guide showed you how to build a simple TypeScript MCP server that exports a default function using the official `McpServer` from the SDK, configure session handling with Zod, and set up your `package.json` module field so Smithery CLI can find your server. This supports both HTTP deployment through Smithery CLI and optional STDIO backward compatibility, with build scripts for both workflows.
+This guide showed how to migrate a TypeScript MCP server from STDIO to HTTP transport using Smithery CLI. We transformed a traditional STDIO server into an exported `createServer` function using the official `McpServer` from the SDK, configured session handling with Zod, and updated `package.json` and `smithery.yaml` for automatic containerization. This approach provides the simplest migration path while supporting both HTTP deployment through Smithery CLI and optional STDIO backward compatibility.
 
 ---
 

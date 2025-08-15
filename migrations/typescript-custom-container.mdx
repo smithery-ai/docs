@@ -366,6 +366,10 @@ CMD ["node", "dist/index.js"]
    npx @smithery/cli playground --port 8080
    ```
 
+   <Note>
+   **Config Handling Limitation**: The Smithery playground doesn't currently support config handling for custom containers (Python/TypeScript). Your deployed server will support configuration, but local testing with the playground will use default/empty config values. We're actively working on adding this support.
+   </Note>
+
 ## Deployment
 
 1. **Push Code**: Push your updated code (including `Dockerfile` and `smithery.yaml`) to GitHub

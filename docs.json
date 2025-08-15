@@ -72,7 +72,6 @@
 				"pages": [
 					"migrations/stdio-to-http",
 					"migrations/typescript-with-smithery-cli",
-					"migrations/custom-container-deployment",
 					"migrations/typescript-custom-container",
 					"migrations/python-custom-container"
 				]
