@@ -17,7 +17,7 @@ HTTP transport offers significant improvements over STDIO:
 
 Smithery supports two ways to host HTTP MCP servers. **Choose your migration approach below to get started with detailed step-by-step instructions.**
 
-<CardGroup>
+<CardGroup cols={2}>
   <Card
     title="TypeScript with Smithery CLI"
     icon="code"
@@ -26,10 +26,17 @@ Smithery supports two ways to host HTTP MCP servers. **Choose your migration app
     Automatic build and deployment for TypeScript projects with minimal configuration
   </Card>
   <Card
-    title="Custom Container Deployment"
-    icon="docker"
-    href="/migrations/custom-container-deployment"
+    title="TypeScript Custom Container"
+    icon="code"
+    href="/migrations/typescript-custom-container"
   >
-    Full Docker container control for any language or advanced use cases
+    Full Docker control for TypeScript projects with custom middleware and dependencies
+  </Card>
+  <Card
+    title="Python Custom Container"
+    icon="python"
+    href="/migrations/python-custom-container"
+  >
+    FastMCP with custom middleware for Python projects requiring full container control
   </Card>
 </CardGroup>
