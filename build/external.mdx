@@ -1,0 +1,33 @@
+---
+title: 'External MCPs'
+description: 'Publish a self-hosted MCP on Smithery to gain distribution and observability while keeping your own hosting.'
+---
+You can publish an MCP to Smithery that is hosted on your own infrastructure.
+
+### Why publish a self-hosted MCP?
+
+- **Distribution**: Make your MCP discoverable and installable via Smithery.
+- **Observability**: Smithery surfaces logs so you can understand how your users are using your MCP.
+
+### Requirements
+
+- **Public HTTPS URL** for your MCP over Streamable HTTP
+- If your server requires user authorization, it should **follow the OAuth spec** your MCP advertises so users can authenticate when prompted.
+
+### Publish an external MCP on Smithery
+
+1. In Smithery, create a New Server.
+2. Choose to publish an External MCP.
+3. In the deployments page, click Deploy and enter your server’s HTTPS URL.
+4. Create the server to finish publishing.
+
+Your server will appear on Smithery and can be installed like any other HTTP MCP.
+
+### Server Scanning
+
+Smithery performs a scan of your server to extract metadata (for example, tools and prompts) used to render your server page.
+
+- If your server is reachable and does not require authorization, the scan completes automatically and your page is populated shortly.
+- If your server requires authorization or additional configuration, we’ll prompt you in the UI to authenticate. This configures a test profile and Smithery will automatically retry the scan. Once the connection succeeds, your server page will update with accurate tool information. See the in-product fix dialog when a scan requires attention.
+
+You can revisit your server page to see the current scan status and logs.

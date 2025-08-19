@@ -64,7 +64,8 @@
 							"build/project-config/smithery-yaml"
 						]
 					},
-					"build/permissions"
+					"build/permissions",
+					"build/external"
 				]
 			},
 			{
