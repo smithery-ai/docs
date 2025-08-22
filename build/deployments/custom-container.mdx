@@ -1,13 +1,13 @@
 ---
-title: 'Custom Container Deployment'
+title: 'Custom Docker Container'
 description: 'Deploy MCP servers using custom Docker containers with full control over your environment.'
 ---
 
+## Docker Container Deployment
+
 For advanced users deploying Docker containers in any programming language. This approach gives you complete control over your runtime environment, dependencies, and server implementation.
 
-## When to Use Custom Containers
-
-Choose custom containers when you:
+Choose Docker containers when you:
 - Need full control over your Docker environment
 - Have complex dependencies or system requirements
 - Want to use languages other than TypeScript
@@ -17,7 +17,8 @@ Choose custom containers when you:
 ## Prerequisites
 
 - Docker installed locally
-- Server that implements [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) transport
+- Server that implements [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) transport with `/mcp` endpoint and CORS configuration
+- Need help building a server? See [Migration Guides](/migrations) or [Cookbooks](/cookbooks)
 
 ## Requirements
 
@@ -28,21 +29,9 @@ Your deployment needs:
 
 We'll cover how to set up each of these in the sections below.
 
-## 1. Build Your Server
+## 1. Setup Configuration
 
-Before deploying, you need a server that implements MCP Streamable HTTP transport. Make sure it has:
-- `/mcp` endpoint to handle protocol messages
-- CORS configuration
-- Smithery config handling (optional)
-
-Check out these examples and cookbooks to quickly get started:
-
-- **[Migration Guides](/migrations)** - Convert existing STDIO servers to HTTP transport
-- **[Cookbooks & Examples](/cookbooks)** - Complete working examples of servers
-
-## 2. Setup Configuration
-
-### 2.1. Create smithery.yaml
+### 1.1. Create smithery.yaml
 
 The `smithery.yaml` file tells Smithery how to build and run your container, and optionally defines what [session configuration](/build/session-config) your server accepts from users.
 
@@ -70,7 +59,7 @@ startCommand:
 **Need more details?** See [Project Configuration](/build/project-config) for complete smithery.yaml options.
 </Note>
 
-### 2.2. Create Dockerfile
+### 1.2. Create Dockerfile
 
 The Dockerfile defines how to build your container image with all dependencies and runtime configuration. Test it builds locally with `docker build .` before deploying.
 
@@ -122,7 +111,7 @@ CMD ["python", "main.py"]
 
 </CodeGroup>
 
-## 4. Deploy
+## 2. Deploy
 
 1. Push your code (including `smithery.yaml` and `Dockerfile`) to GitHub
 2. [Connect your GitHub](https://smithery.ai/new) to Smithery (or claim your server if already listed)

@@ -3,7 +3,7 @@ title: 'Deployments'
 description: 'Learn how to deploy your MCP server on Smithery.'
 ---
 
-Once you've [built your MCP server](/getting_started/quickstart_build), you're ready to deploy it to Smithery! 
+Once you've [built your MCP server](/getting_started/quickstart_build), you're ready to deploy it to Smithery.
 
 Smithery Deployments allow you to distribute your MCP server to users of Smithery, hosted and served over [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection. This lets users easily access your server seamlessly from any MCP client, eliminating the need for them to install dependencies or worry about security.
 
@@ -11,20 +11,8 @@ If you're self-hosting and only need listing and distribution on Smithery, you c
 
 ## Choose Your Deployment Method
 
-| Feature | TypeScript Deployment | Custom Container |
-|---------|----------------------|------------------|
-| **Setup Complexity** | Simple | Advanced |
-| **Build Time** | Fast | Varies |
-| **Language Support** | TypeScript/JavaScript | Any language |
-| **Container Control** | Automatic | Full control |
-| **Dependencies** | npm/Node.js only | Any system dependencies |
-| **Configuration** | Zod schemas | Custom implementation |
-| **Best For** | Quick prototypes, standard servers | Complex requirements, other languages |
-
-**Ready to deploy?**
-
-- **[TypeScript Deployment](/build/deployments/typescript)** (Recommended) - For servers using the official MCP TypeScript SDK. Use `npm create smithery` to create a scaffold if you're starting from scratch
-- **[Custom Container Deployment](/build/deployments/custom-container)** (Advanced) - Need custom environment or using another language? Get full Docker control
+- **[Using Smithery CLI](/build/deployments/typescript)** (Recommended) - For servers using the official MCP TypeScript SDK. Use `npm create smithery` to create a scaffold if you're starting from scratch
+- **[Using Docker Container](/build/deployments/custom-container)** (Advanced) - Need custom environment or using another language? Get full Docker control
 
 **Already hosted elsewhere?**
 
