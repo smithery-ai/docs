@@ -58,7 +58,7 @@
 					{
 						"group": "Deployments",
 						"pages": [
-							"build/deployments",
+							"build/deployments/index",
 							"build/deployments/typescript",
 							"build/deployments/custom-container"
 						]

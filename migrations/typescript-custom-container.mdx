@@ -296,6 +296,7 @@ build:
   dockerBuildPath: "."               # Docker build context
 startCommand:
   type: "http"
+  # configSchema and exampleConfig are optional - remove if no configuration needed
   configSchema:                      # Optional: Define configuration schema
     type: object
     required: [apiKey]
@@ -306,7 +307,6 @@ startCommand:
   exampleConfig:                     # Optional: Example configuration
     apiKey: "sk-example-123"
 ```
-
 </CodeGroup>
 
 ### Step 6: Update Dockerfile
@@ -352,10 +352,8 @@ COPY . .
 # Build the TypeScript code
 RUN npm run build
 
-# Set transport mode to HTTP and port to 8080 as required by Smithery proxy
+# Set transport mode to HTTP
 ENV TRANSPORT=http
-ENV PORT=8080
-EXPOSE 8080
 
 # Start the server directly with node
 CMD ["node", "dist/index.js"]
@@ -400,7 +398,7 @@ Configure `package.json` for both HTTP and STDIO workflows:
 2. **Or with Docker:**
    ```bash
    docker build -t my-mcp-server .
-   docker run -p 8080:8080 -e PORT=8080 my-mcp-server
+   docker run -p 8080:8080 my-mcp-server
    ```
 
 3. **Test interactively:**

@@ -3,22 +3,16 @@ title: 'Deployments'
 description: 'Learn how to deploy your MCP server on Smithery.'
 ---
 
-Once you've [built your MCP server](/getting_started/quickstart_build), you're ready to deploy it to Smithery.
-
 Smithery Deployments allow you to distribute your MCP server to users of Smithery, hosted and served over [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection. This lets users easily access your server seamlessly from any MCP client, eliminating the need for them to install dependencies or worry about security.
 
-If you're self-hosting and only need listing and distribution on Smithery, you can publish an external MCP by URL. See [External MCPs](/build/external).
+> If you're self-hosting and only need listing and distribution on Smithery, you can publish an external MCP by URL. See [External MCPs](/build/external).
 
 ## Choose Your Deployment Method
 
 - **[Using Smithery CLI](/build/deployments/typescript)** (Recommended) - For servers using the official MCP TypeScript SDK. Use `npm create smithery` to create a scaffold if you're starting from scratch
 - **[Using Docker Container](/build/deployments/custom-container)** (Advanced) - Need custom environment or using another language? Get full Docker control
 
-**Already hosted elsewhere?**
-
-- **[External MCP](/build/external)** - Publish your existing HTTP server on Smithery for distribution while keeping your own infrastructure
-
 **Have an STDIO server that runs locally?**
 
-- Check our [migration guides](/migrations) to convert it for Smithery deployment
+- Check our [migration guides](/migrations/stdio-to-http) to convert it for Smithery deployment
 

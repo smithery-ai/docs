@@ -166,9 +166,13 @@ if __name__ == "__main__":
     main()
 ```
 
-### Step 4: Create Middleware Setup
+### Step 4: Create Middleware Setup (Optional)
 
-Create the middleware for handling Smithery configuration:
+Create the middleware for handling Smithery configuration. **This step is only needed if your MCP server requires configuration** (API keys, settings, etc.):
+
+<Note>
+**Skip this step if no configuration needed**: If your MCP server doesn't need any configuration, you can skip creating this middleware entirely. Simply remove the `SmitheryConfigMiddleware` import and usage from your main.py file, and your server will work perfectly fine without it.
+</Note>
 
 ```python
 # middleware/__init__.py
@@ -239,6 +243,7 @@ build:
   dockerBuildPath: "."               # Docker build context
 startCommand:
   type: "http"
+  # configSchema and exampleConfig are optional - remove if no configuration needed
   configSchema:                      # Optional: Define configuration schema
     type: object
     required: [apiKey]
@@ -248,6 +253,16 @@ startCommand:
         description: Your API key
   exampleConfig:                     # Optional: Example configuration
     apiKey: "sk-example-123"
+```
+
+```yaml Minimal (No Configuration)
+# smithery.yaml - for servers that don't need configuration
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+startCommand:
+  type: "http"
 ```
 
 </CodeGroup>
@@ -322,10 +337,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Set transport mode to HTTP and port to 8080 as required by Smithery proxy
+# Set transport mode to HTTP
 ENV TRANSPORT=http
-ENV PORT=8080
-EXPOSE 8080
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
@@ -356,7 +369,7 @@ CMD ["python", "main.py"]
 2. **Or with Docker:**
    ```bash
    docker build -t character-counter .
-   docker run -p 8080:8080 -e PORT=8080 character-counter
+   docker run -p 8080:8080 character-counter
    ```
 
 3. **Test interactively:**

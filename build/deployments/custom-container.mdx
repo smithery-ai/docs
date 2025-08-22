@@ -19,6 +19,10 @@ Choose Docker containers when you:
 - Server that listens on a configurable `PORT` environment variable (Smithery will set this to 8081)
 - **(Optional)** Server that can optionally handle session configuration passed by Smithery (API keys, settings, etc.) - see our [cookbook](/cookbooks/python_custom_container) for a complete example
 
+<Note>
+**New to custom containers?** See our [Python FastMCP Server cookbook](/cookbooks/python_custom_container) for a complete working example that demonstrates all the requirements above.
+</Note>
+
 ## Requirements
 
 Your deployment needs:
@@ -40,9 +44,9 @@ my-mcp-server/
 
 We'll cover how to set up each of these in the sections below.
 
-## 1. Setup Configuration
+## Setup
 
-### 1.1. Create smithery.yaml
+### 1. Create smithery.yaml
 
 The `smithery.yaml` file tells Smithery how to build and run your container, and optionally defines what [session configuration](/build/session-config) your server accepts from users.
 
@@ -70,7 +74,7 @@ startCommand:
 **Need more details?** See [Project Configuration](/build/project-config) for complete smithery.yaml options and [Session Configuration](/build/session-config) for handling user settings.
 </Note>
 
-### 1.2. Create Dockerfile
+### 2. Create Dockerfile
 
 The Dockerfile defines how to build your container image with all dependencies and runtime configuration. Test it builds locally with `docker build .` before deploying.
 
@@ -125,7 +129,7 @@ CMD ["uv", "run", "python", "main.py"]
 
 </CodeGroup>
 
-## 2. Deploy
+## Deploy
 
 1. Push your code (including `smithery.yaml` and `Dockerfile`) to GitHub
 2. [Connect your GitHub](https://smithery.ai/new) to Smithery (or claim your server if already listed)

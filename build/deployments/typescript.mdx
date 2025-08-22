@@ -7,9 +7,8 @@ description: 'Deploy TypeScript MCP servers on Smithery with automatic builds us
 
 Choose TypeScript with Smithery CLI when you:
 - Want the fastest deployment path for TypeScript/Node.js servers
-- Prefer automatic builds without Docker complexity
-- Have a standard TypeScript project structure with npm/package.json
-- Don't need custom system dependencies or complex runtime environments
+- Let Smithery handle containerization
+- Have a standard TypeScript/Node.js project without custom system dependencies
 - Want to focus on MCP server logic rather than infrastructure setup
 
 For more control over your environment or non-TypeScript languages, consider [Custom Docker Container](/build/deployments/custom-container) deployment.
@@ -18,9 +17,10 @@ For more control over your environment or non-TypeScript languages, consider [Cu
 
 - TypeScript MCP server using the official MCP SDK that exports the MCP server object at entry point
 - Node.js 18+ and npm installed locally
-- GitHub repository for your code
 
+<Note>
 **New to MCP servers?** See the [Getting Started guide](/getting_started/quickstart_build) to learn how to build TypeScript MCP servers from scratch using the official SDK.
+</Note>
 
 ## Project Structure
 
@@ -45,7 +45,7 @@ Create a `smithery.yaml` file in your repository root:
 runtime: "typescript"
 ```
 
-That's it! This minimal configuration is intentional - Smithery CLI handles containerization, HTTP transport, and deployment automatically for TypeScript projects.
+That's it! This minimal configuration is intentional - Smithery handles containerization, HTTP transport, and deployment automatically for TypeScript projects.
 
 ### 2. Configure package.json
 
@@ -78,6 +78,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 // Required: Export default createServer function
 export default function createServer({ config }) {
+  // config contains user-provided settings (see configSchema below)
   const server = new McpServer({
     name: "Your Server Name",
     version: "1.0.0",
