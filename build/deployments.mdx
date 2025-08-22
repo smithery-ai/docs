@@ -7,89 +7,59 @@ Smithery Deployments allow you to host your MCP server on Smithery served over [
 
 If you're self-hosting and only need listing and distribution on Smithery, you can publish an external MCP by URL. See [External MCPs](/build/external).
 
-## Which deployment method should I use?
+## Deployment Options
 
-- **[TypeScript Deploy](#typescript-deploy)**: Choose this if you're building with TypeScript using the Smithery CLI
-- **[Custom Deploy](#custom-deploy)**: Choose this if you're using another language or need full control over your Docker container
+Choose the deployment method that best fits your needs:
 
-## TypeScript Deploy
+<CardGroup>
+  <Card
+    title="TypeScript Deployment"
+    subtitle="Recommended for Most Users"
+    icon="rocket"
+    href="/build/deployments/typescript"
+  >
+    Automatic builds with TypeScript runtime. Perfect for servers built with the Smithery CLI.
+  </Card>
 
-The fastest way to deploy TypeScript MCP servers on Smithery. This method automatically builds and deploys your server using our TypeScript runtime.
+  <Card
+    title="Custom Container Deployment"
+    subtitle="Advanced Users"
+    icon="container"
+    href="/build/deployments/custom-container"
+  >
+    Full Docker control for any language. Complete flexibility over your environment and dependencies.
+  </Card>
+</CardGroup>
 
-### Prerequisites
+## Comparison
 
-- TypeScript MCP server
-- Built with the [Smithery CLI](https://github.com/smithery-ai/cli)
-- Repository with `package.json` and proper entry points
+| Feature | TypeScript Deployment | Custom Container |
+|---------|----------------------|------------------|
+| **Setup Complexity** | Simple | Advanced |
+| **Build Time** | Fast | Varies |
+| **Language Support** | TypeScript/JavaScript | Any language |
+| **Container Control** | Automatic | Full control |
+| **Dependencies** | npm/Node.js only | Any system dependencies |
+| **Configuration** | Zod schemas | Custom implementation |
+| **Best For** | Quick prototypes, standard servers | Complex requirements, other languages |
 
-### Setup
+## Getting Started
 
-Create a `smithery.yaml` file in your repository root:
+1. **New to MCP development?** Start with [TypeScript Deployment](/build/deployments/typescript)
+2. **Need custom environment?** Use [Custom Container Deployment](/build/deployments/custom-container)
+3. **Already have a server?** Check our [migration guides](/migrations)
 
-```yaml
-runtime: "typescript"
-```
+## Common Use Cases
 
-See the [Getting Started guide](/build/getting-started) for complete TypeScript server development instructions.
+### TypeScript Deployment
+- API integrations and web scraping
+- Database connections with standard drivers
+- File processing and text manipulation
+- Standard npm package dependencies
 
-### Deploy
-
-1. Push your code (including `smithery.yaml`) to GitHub
-2. [Connect your GitHub](/new) to Smithery (or claim your server if already listed)
-3. Navigate to the Deployments tab on your server page
-4. Click Deploy to build and host your server
-
-## Custom Deploy
-
-For advanced users deploying Docker containers in any programming language.
-
-### Prerequisites
-
-- Docker container that implements [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http)
-- Dockerfile in your repository
-- Server that listens on `PORT` environment variable
-
-### Technical Requirements
-
-#### HTTP Endpoint
-- **Endpoint**: `/mcp` must be available
-- **Methods**: Handle `GET`, `POST`, and `DELETE` requests
-- **Port**: Listen on `PORT` environmental variable
-
-#### Configuration Handling
-Smithery passes [configuration](/build/session-config) as query parameters using dot-notation:
-
-```
-GET/POST /mcp?server.host=localhost&server.port=8080&apiKey=secret123
-```
-
-Parse these into a configuration object supporting nested properties.
-
-### Setup
-
-Create a `smithery.yaml` file:
-
-```yaml
-runtime: "container"
-build:
-  dockerfile: "Dockerfile"           # Path to your Dockerfile
-  dockerBuildPath: "."               # Docker build context
-startCommand:
-  type: "http"
-  configSchema:                      # JSON Schema for configuration
-    type: "object"
-    properties:
-      apiKey:
-        type: "string"
-        description: "Your API key"
-    required: ["apiKey"]
-  exampleConfig:
-    apiKey: "sk-example123"
-```
-
-### Deploy
-
-1. Push your code (including `smithery.yaml` and `Dockerfile`) to GitHub
-2. [Connect your GitHub](/new) to Smithery (or claim your server if already listed)
-3. Navigate to the Deployments tab on your server page
-4. Click Deploy to build and host your container
+### Custom Container Deployment
+- Python servers with ML libraries
+- Servers requiring system-level dependencies
+- Multi-language applications
+- Custom middleware and authentication
+- Specialized database drivers or native extensions

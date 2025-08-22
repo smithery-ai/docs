@@ -51,10 +51,18 @@
 				]
 			},
 			{
-				"group": "Build MCP Servers",
+				"group": "Build & Host MCP Servers",
 				"pages": [
 					"build/index",
-					"build/deployments",
+					"build/custom-containers",
+					{
+						"group": "Deployments",
+						"pages": [
+							"build/deployments",
+							"build/deployments/typescript",
+							"build/deployments/custom-container"
+						]
+					},
 					"build/session-config",
 					{
 						"group": "Project Configuration",

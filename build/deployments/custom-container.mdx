@@ -1,0 +1,232 @@
+---
+title: 'Custom Container Deployment'
+description: 'Deploy MCP servers using custom Docker containers with full control over your environment.'
+---
+
+For advanced users deploying Docker containers in any programming language. This approach gives you complete control over your runtime environment, dependencies, and server implementation.
+
+## When to Use Custom Containers
+
+Choose custom containers when you:
+- Need full control over your Docker environment
+- Have complex dependencies or system requirements
+- Want to use languages other than TypeScript
+- Need specific middleware or custom server logic
+- Require custom build processes
+
+## Prerequisites
+
+- Docker installed locally
+- Server that implements [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) transport
+
+## Requirements
+
+Your deployment needs:
+
+- **Dockerfile** - Container configuration file
+- **smithery.yaml** - Project and session configuration
+
+We'll cover how to set up each of these in the sections below.
+
+## 1. Build Your Server
+
+Before deploying, you need a server that implements MCP Streamable HTTP transport. Make sure it has:
+- `/mcp` endpoint to handle protocol messages
+- CORS configuration
+- Smithery config handling (optional)
+
+Check out these examples and cookbooks to quickly get started:
+
+- **[Migration Guides](/migrations)** - Convert existing STDIO servers to HTTP transport
+- **[Cookbooks & Examples](/cookbooks)** - Complete working examples of servers
+
+## 2. Setup Configuration
+
+### 2.1. Create smithery.yaml
+
+The `smithery.yaml` file tells Smithery how to build and run your container, and optionally defines what [session configuration](/build/session-config) your server accepts from users.
+
+Create a `smithery.yaml` file in your repository root:
+
+```yaml
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"           # Path to your Dockerfile
+  dockerBuildPath: "."               # Docker build context
+startCommand:
+  type: "http"
+  configSchema:                      # Optional: JSON Schema for configuration
+    type: "object"
+    properties:
+      apiKey:
+        type: "string"
+        description: "API key for external service"
+    required: ["apiKey"]
+  exampleConfig:                     # Optional: Example configuration
+    apiKey: "your-api-key-here"
+```
+
+<Note>
+**Need more details?** See [Project Configuration](/build/project-config) for complete smithery.yaml options.
+</Note>
+
+### 2.2. Create Dockerfile
+
+The Dockerfile defines how to build your container image with all dependencies and runtime configuration. Test it builds locally with `docker build .` before deploying.
+
+Your Dockerfile should:
+- Install dependencies and build your application
+- Handle the `/mcp` endpoint
+- Start your server process
+
+<CodeGroup>
+
+```dockerfile Node.js/TypeScript
+FROM node:22-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build if needed
+RUN npm run build
+
+# Start the server
+CMD ["node", "dist/index.js"]
+```
+
+```dockerfile Python
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip install -r requirements.txt
+
+# Copy source code
+COPY . .
+
+# Start the server
+CMD ["python", "main.py"]
+```
+
+</CodeGroup>
+
+## 4. Deploy
+
+1. Push your code (including `smithery.yaml` and `Dockerfile`) to GitHub
+2. [Connect your GitHub](https://smithery.ai/new) to Smithery (or claim your server if already listed)
+3. Navigate to the Deployments tab on your server page
+4. Click Deploy to build and host your container
+
+## Build Process
+
+When you deploy, Smithery will:
+
+1. Clone your repository
+2. Build your Docker container using your Dockerfile
+3. Deploy the container to our hosting infrastructure
+4. Make it available at `https://server.smithery.ai/your-server/mcp`
+5. Handle load balancing, scaling, and monitoring
+
+## Advanced Configuration
+
+### Environment Variables
+
+You can set environment variables in your `smithery.yaml`:
+
+```yaml
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+  env:
+    NODE_ENV: "production"
+    LOG_LEVEL: "info"
+```
+
+### Multi-stage Builds
+
+Use multi-stage Docker builds for smaller production images:
+
+```dockerfile
+# Build stage
+FROM node:22 AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM node:22-slim
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY package*.json ./
+
+ENV PORT=8080
+EXPOSE 8080
+CMD ["node", "dist/index.js"]
+```
+
+### Health Checks
+
+Add health checks to your container:
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:$PORT/health || exit 1
+```
+
+```typescript
+// Add to your Express app
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+```
+
+## Troubleshooting
+
+### Build Failures
+
+Common issues and solutions:
+
+- **Docker build fails**: Check your Dockerfile syntax and ensure all files are copied correctly
+- **Dependencies not found**: Make sure your package files are copied before installing dependencies
+- **Permission errors**: Set appropriate user permissions in your Dockerfile
+
+### Runtime Issues
+
+- **Port binding errors**: Ensure your server listens on the `PORT` environment variable
+- **Configuration not working**: Verify your config parsing logic handles base64 encoded parameters
+- **CORS errors**: Configure CORS headers properly for browser-based clients
+
+### Performance Optimization
+
+- Use multi-stage builds to reduce image size
+- Implement connection pooling for databases
+- Add caching layers where appropriate
+- Use health checks for better reliability
+
+## Migration Guides
+
+- [Migrating from STDIO to HTTP](/migrations/stdio-to-http)
+- [TypeScript Custom Container Migration](/migrations/typescript-custom-container)
+- [Python Custom Container Migration](/migrations/python-custom-container)
+
+## Examples
+
+- [TypeScript Express Server](https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/typescript/custom-container)
+- [Python Flask Server](https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/python/custom-container)
+- [Go HTTP Server](https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/go/custom-container)

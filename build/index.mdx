@@ -1,6 +1,6 @@
 ---
 title: "Build MCPs"
-description: "Learn how to build your Model Context Protocol (MCP) server on Smithery."
+description: "Learn how to build and host your Model Context Protocol (MCP) server on Smithery."
 ---
 
 Smithery supports developers building MCPs by providing [CI/CD deployments and hosting](/build/deployments).
@@ -11,18 +11,33 @@ Smithery supports developers building MCPs by providing [CI/CD deployments and h
 - Users can call your server without installing dependencies or be concerned about security.
 - Smithery will rank hosted servers higher in our search results.
 
-For developers, we provide an [SDK](https://github.com/smithery-ai/sdk/) to make it easier to deploy servers on Smithery.
+## Getting Started
+
+Choose your development approach:
+
+<CardGroup>
+  <Card
+    title="Quick Start (Recommended)"
+    icon="rocket"
+    href="/getting_started/quickstart_build"
+  >
+    Uses the official MCP TypeScript SDK with Smithery CLI for building and interactive testing with playground
+  </Card>
+
+  <Card
+    title="Custom Container (Advanced)"
+    icon="container"
+    href="/build/custom-containers"
+  >
+    Build MCP servers with any language using Docker containers for maximum flexibility
+  </Card>
+</CardGroup>
 
 > If you already host your MCP elsewhere and just want distribution and observability on Smithery, see [External MCPs (self-hosted)](/build/external).
 
-## Getting Started
-
-**New to building MCPs?** Start with our comprehensive guide:
-
-- **[TypeScript Getting Started Guide](/getting_started/quickstart_build)** - Complete walkthrough for TypeScript developers using the Smithery CLI `dev` and `build` commands
-
 ## Resources
 
+- [Building Custom Containers](/build/custom-containers) - Build MCP servers with any language using Docker
 - [Deployments](/build/deployments) - Learn about hosting your MCP servers
 - [Project Configuration](/build/project-config) - Advanced configuration options
 - [Permissions](/build/permissions) - Understanding MCP permissions

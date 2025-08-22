@@ -1,0 +1,69 @@
+---
+title: 'TypeScript Deployment'
+description: 'Deploy TypeScript MCP servers on Smithery with automatic builds.'
+---
+
+The fastest way to deploy TypeScript MCP servers on Smithery. This method automatically builds and deploys your server using our TypeScript runtime.
+
+## Prerequisites
+
+- TypeScript MCP server
+- Built with the [Smithery CLI](https://github.com/smithery-ai/cli)
+- Repository with `package.json` and proper entry points
+
+## Setup
+
+Create a `smithery.yaml` file in your repository root:
+
+```yaml
+runtime: "typescript"
+```
+
+See the [Getting Started guide](/getting_started/quickstart_build) for complete TypeScript server development instructions.
+
+## Deploy
+
+1. Push your code (including `smithery.yaml`) to GitHub
+2. [Connect your GitHub](https://smithery.ai/new) to Smithery (or claim your server if already listed)
+3. Navigate to the Deployments tab on your server page
+4. Click Deploy to build and host your server
+
+## Configuration
+
+For servers that require configuration (API keys, settings, etc.), export a `configSchema` in your TypeScript code:
+
+```typescript
+import { z } from "zod";
+
+export const configSchema = z.object({
+  apiKey: z.string().describe("Your API key"),
+  timeout: z.number().default(5000).describe("Request timeout in milliseconds"),
+});
+```
+
+This schema will automatically generate configuration forms for users connecting to your server.
+
+## Build Process
+
+When you deploy, Smithery will:
+
+1. Clone your repository
+2. Install dependencies with `npm ci`
+3. Build your TypeScript code with `npm run build`
+4. Package and deploy your server
+5. Make it available at `https://server.smithery.ai/your-server/mcp`
+
+## Troubleshooting
+
+### Build Failures
+
+If your build fails, check:
+- Your `package.json` has a `build` script
+- All dependencies are listed in `dependencies` or `devDependencies`
+- Your TypeScript compiles without errors locally
+
+### Runtime Issues
+
+- Ensure your server exports a default function that returns an MCP server instance
+- Check that your configuration schema matches what users are providing
+- Review the deployment logs in your server's dashboard
