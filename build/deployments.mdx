@@ -5,18 +5,11 @@ description: 'Learn how to deploy your MCP server on Smithery.'
 
 Once you've [built your MCP server](/getting_started/quickstart_build), you're ready to deploy it to Smithery! 
 
-Smithery Deployments allow you to host your MCP server on Smithery served over [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection. This gives your users access to a tool playground and eliminates the need for them to install dependencies or worry about security.
+Smithery Deployments allow you to distribute your MCP server to users of Smithery, hosted and served over [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection. This lets users easily access your server seamlessly from any MCP client, eliminating the need for them to install dependencies or worry about security.
 
 If you're self-hosting and only need listing and distribution on Smithery, you can publish an external MCP by URL. See [External MCPs](/build/external).
 
-## Deployment Options
-
-Choose the deployment method that best fits your needs:
-
-- **[TypeScript Deployment](/build/deployments/typescript)** (Recommended) - Automatic builds with TypeScript runtime. Perfect for servers built with the Smithery CLI.
-- **[Custom Container Deployment](/build/deployments/custom-container)** (Advanced) - Full Docker control for any language. Complete flexibility over your environment and dependencies.
-
-## Comparison
+## Choose Your Deployment Method
 
 | Feature | TypeScript Deployment | Custom Container |
 |---------|----------------------|------------------|
@@ -28,11 +21,16 @@ Choose the deployment method that best fits your needs:
 | **Configuration** | Zod schemas | Custom implementation |
 | **Best For** | Quick prototypes, standard servers | Complex requirements, other languages |
 
-## Getting Started
+**Ready to deploy?**
 
-Ready to deploy your server? Choose your deployment method:
+- **[TypeScript Deployment](/build/deployments/typescript)** (Recommended) - For servers using the official MCP TypeScript SDK. Use `npm create smithery` to create a scaffold if you're starting from scratch
+- **[Custom Container Deployment](/build/deployments/custom-container)** (Advanced) - Need custom environment or using another language? Get full Docker control
 
-1. **Built with Smithery CLI?** Use [TypeScript Deployment](/build/deployments/typescript) - it's optimized for servers created with `npm create smithery`
-2. **Need custom environment or using another language?** Use [Custom Container Deployment](/build/deployments/custom-container)
-3. **Already have a server elsewhere?** Check our [migration guides](/migrations) to move to Smithery
+**Already hosted elsewhere?**
+
+- **[External MCP](/build/external)** - Publish your existing HTTP server on Smithery for distribution while keeping your own infrastructure
+
+**Have an STDIO server that runs locally?**
+
+- Check our [migration guides](/migrations) to convert it for Smithery deployment
 
