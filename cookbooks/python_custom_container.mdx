@@ -5,15 +5,6 @@ description: "Build and deploy a Python MCP server using Docker containers with 
 
 Build an MCP server using Docker containers for maximum flexibility. While this example uses Python, the Docker container principles and patterns shown here can be adapted to any programming language - Go, Rust, Java, C#, or any other language of your choice.
 
-## When to Use This Approach
-
-Choose Docker containers when you:
-- Want to use any programming language (not just TypeScript/JavaScript)
-- Need full control over your Docker environment  
-- Have complex system dependencies or requirements
-- Want custom middleware, build processes, or runtime configurations
-- Need specific libraries or tools not available in standard deployments
-
 ## Show me the repo
 
 <Card
@@ -44,6 +35,10 @@ We'll build a simple MCP server with a `count_characters` tool that:
 - Python 3.11+ and uv
 - Docker installed locally
 - A [Smithery API key](https://smithery.ai) for development features
+
+<Note>
+**Port Requirement**: Your server must listen on the configurable `PORT` environment variable. Smithery will set this to **8081** when deployed, but you can use any port for local development.
+</Note>
 
 ## Step 1: Basic Server Setup
 
@@ -193,7 +188,7 @@ def main():
     # Apply custom middleware for config extraction
     app = SmitheryConfigMiddleware(app, handle_config)
 
-    # Get port from environment variable (defaults to 8080)
+    # Get port from environment variable (Smithery sets this to 8081)
     port = int(os.environ.get("PORT", 8080))
     print(f"Listening on port {port}")
 
@@ -290,11 +285,21 @@ docker build -t character-counter .
 docker run -p 8080:8080 -e PORT=8080 character-counter
 ```
 
+<Note>
+**Local vs Deployed Ports**: For local testing, you can use any port (like 8080 above). However, when deployed to Smithery, your server **must** listen on the `PORT` environment variable, which Smithery will set to 8081.
+</Note>
+
 **Test interactively**: Once your server is running in HTTP mode, you can test it interactively using the Smithery playground:
 
 ```bash
 npx @smithery/cli playground --port 8080
 ```
+
+<img
+  src="/images/smithery_playground.png"
+  alt="Smithery Playground Interface"
+  className="rounded-lg border shadow-sm"
+/>
 
 <Warning>
 **Config Handling Limitation**: The Smithery playground doesn't currently support config handling for custom containers (Python/TypeScript). Your deployed server will support configuration, but local testing with the playground will use default/empty config values. We're actively working on adding this support.
