@@ -54,7 +54,6 @@
 				"group": "Build & Host MCP Servers",
 				"pages": [
 					"build/index",
-					"build/custom-containers",
 					{
 						"group": "Deployments",
 						"pages": [
