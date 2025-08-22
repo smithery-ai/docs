@@ -39,8 +39,8 @@
 			{
 				"group": "Cookbooks",
 				"pages": [
-					"cookbooks/python_custom_container",
-					"cookbooks/typescript_oauth_client"
+					"cookbooks/typescript_oauth_client",
+					"cookbooks/python_custom_container"
 				]
 			},
 			{

@@ -16,7 +16,20 @@ Choose Docker containers when you:
 
 ## Show me the repo
 
-[View the fully runnable GitHub repo for this example](https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/python/quickstart)
+<Card
+  title="Show me the repo"
+  icon="github"
+  href="https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/python/quickstart"
+>
+  View the fully runnable GitHub repo for this example
+</Card>
+
+**Want to follow along?** Clone the example repository:
+
+```bash
+git clone https://github.com/smithery-ai/smithery-cookbook.git
+cd smithery-cookbook/servers/python/quickstart
+```
 
 ## What We're Building
 
@@ -28,7 +41,7 @@ We'll build a simple MCP server with a `count_characters` tool that:
 
 ### Prerequisites
 
-- Python 3.11+ and pip
+- Python 3.11+ and uv
 - Docker installed locally
 - A [Smithery API key](https://smithery.ai) for development features
 
@@ -159,6 +172,7 @@ This middleware:
 - Decodes and parses the JSON configuration  
 - Calls your config callback function to handle the extracted config
 - Provides error handling and logging for debugging
+- Can be optionally extended to add additional logging functionality
 
 ## Step 5: Update smithery.yaml
 
@@ -214,10 +228,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Set transport mode to HTTP and port to 8080 as required by Smithery proxy
+# Set transport mode to HTTP as required by Smithery proxy
 ENV TRANSPORT=http
-ENV PORT=8080
-EXPOSE 8080
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
@@ -269,6 +281,6 @@ Smithery will automatically build your container and host your MCP server.
 
 ## Summary
 
-This guide showed how to build a Python MCP server using custom Docker containers and FastMCP. We implemented a character counter tool with proper CORS configuration, used SmitheryConfigMiddleware for configuration handling, and set up HTTP transport. This approach gives you full control over your Python environment and middleware.
+This guide showed how to build a Python MCP server using custom Docker containers and FastMCP. We implemented a character counter tool with proper CORS configuration, used SmitheryConfigMiddleware for configuration handling, and set up HTTP transport. This approach gives you full control over your Python environment and middleware, and can be extended to work with any other programming language by adapting the Dockerfile and server implementation.
 
 Need help? Join our [Discord](https://discord.gg/Afd38S5p9A) or email [support@smithery.ai](mailto:support@smithery.ai) for assistance.

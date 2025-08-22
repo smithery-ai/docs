@@ -3,15 +3,41 @@ title: 'TypeScript with Smithery CLI'
 description: 'Deploy TypeScript MCP servers on Smithery with automatic builds using Smithery CLI.'
 ---
 
-The fastest way to deploy TypeScript MCP servers on Smithery. This method automatically builds and deploys your server using our TypeScript runtime.
+## When to Use This Approach
+
+Choose TypeScript with Smithery CLI when you:
+- Want the fastest deployment path for TypeScript/Node.js servers
+- Prefer automatic builds without Docker complexity
+- Have a standard TypeScript project structure with npm/package.json
+- Don't need custom system dependencies or complex runtime environments
+- Want to focus on MCP server logic rather than infrastructure setup
+
+For more control over your environment or non-TypeScript languages, consider [Custom Docker Container](/build/deployments/custom-container) deployment.
 
 ## Prerequisites
 
-- TypeScript MCP server
-- Built with the [Smithery CLI](https://github.com/smithery-ai/cli)
-- Repository with `package.json` and proper entry points
+- TypeScript MCP server using the official MCP SDK that exports the MCP server object at entry point
+- Node.js 18+ and npm installed locally
+- GitHub repository for your code
+
+**New to MCP servers?** See the [Getting Started guide](/getting_started/quickstart_build) to learn how to build TypeScript MCP servers from scratch using the official SDK.
+
+## Project Structure
+
+Your TypeScript project should look like this:
+
+```
+my-mcp-server/
+  smithery.yaml          # Smithery configuration
+  package.json           # Node.js dependencies and scripts
+  tsconfig.json          # TypeScript configuration
+  src/
+    index.ts             # Your MCP server code with exported createServer function
+```
 
 ## Setup
+
+### 1. Configure smithery.yaml
 
 Create a `smithery.yaml` file in your repository root:
 
@@ -19,7 +45,78 @@ Create a `smithery.yaml` file in your repository root:
 runtime: "typescript"
 ```
 
-See the [Getting Started guide](/getting_started/quickstart_build) for complete TypeScript server development instructions.
+That's it! This minimal configuration is intentional - Smithery CLI handles containerization, HTTP transport, and deployment automatically for TypeScript projects.
+
+### 2. Configure package.json
+
+Your `package.json` must include the `module` field pointing to your server entry point:
+
+```json
+{
+  "name": "my-mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "module": "src/index.ts",
+  "scripts": {
+    "build": "npx @smithery/cli build",
+    "dev": "npx @smithery/cli dev"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.3",
+    "zod": "^3.25.46"
+  }
+}
+```
+
+### 3. Ensure Proper Server Structure
+
+Your TypeScript MCP server must export a default `createServer` function that returns the MCP server object. If you built your server following the [Getting Started guide](/getting_started/quickstart_build), it should already have this structure.
+
+```typescript
+// src/index.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+
+// Required: Export default createServer function
+export default function createServer({ config }) {
+  const server = new McpServer({
+    name: "Your Server Name",
+    version: "1.0.0",
+  });
+
+  // Register your tools here...
+  
+  return server.server; // Must return the MCP server object
+}
+```
+
+**Optional Configuration Schema**: If your server needs user configuration (API keys, settings, etc.), export a `configSchema`:
+
+```typescript
+// Optional: If your server doesn't need configuration, omit this
+export const configSchema = z.object({
+  apiKey: z.string().describe("Your API key"),
+  timeout: z.number().default(5000).describe("Request timeout in milliseconds"),
+});
+```
+
+**Where it goes**: Export `configSchema` from the same file as your `createServer` function (typically `src/index.ts`).
+
+**What it does**: Automatically generates configuration forms for users connecting to your server.
+
+## Local Development
+
+Test your server locally using the Smithery CLI:
+
+```bash
+# Start development server with interactive playground
+npm run dev
+```
+
+This opens the **Smithery interactive playground** where you can:
+- Test your MCP server tools in real-time
+- See tool responses and debug issues
+- Validate your configuration schema
+- Experiment with different inputs
 
 ## Deploy
 
@@ -28,42 +125,33 @@ See the [Getting Started guide](/getting_started/quickstart_build) for complete 
 3. Navigate to the Deployments tab on your server page
 4. Click Deploy to build and host your server
 
-## Configuration
 
-For servers that require configuration (API keys, settings, etc.), export a `configSchema` in your TypeScript code:
 
-```typescript
-import { z } from "zod";
-
-export const configSchema = z.object({
-  apiKey: z.string().describe("Your API key"),
-  timeout: z.number().default(5000).describe("Request timeout in milliseconds"),
-});
-```
-
-This schema will automatically generate configuration forms for users connecting to your server.
-
-## Build Process
+## What Happens Under the Hood
 
 When you deploy, Smithery will:
 
 1. Clone your repository
-2. Install dependencies with `npm ci`
-3. Build your TypeScript code with `npm run build`
-4. Package and deploy your server
-5. Make it available at `https://server.smithery.ai/your-server/mcp`
+2. Parse your `smithery.yaml` to understand your TypeScript configuration
+3. Install dependencies with `npm ci`
+4. Build your TypeScript code using the `module` entry point from your `package.json` 
+5. Package your server into a containerized HTTP service
+6. Deploy the container to our hosting infrastructure
+7. Send MCP `initialize` and `list_tools` messages with a dummy configuration to discover your server's capabilities
+8. Make it available at `https://server.smithery.ai/your-server/mcp`
+9. Handle load balancing, scaling, and monitoring
 
 ## Troubleshooting
 
-### Build Failures
+### Why does my deployment fail?
 
-If your build fails, check:
-- Your `package.json` has a `build` script
-- All dependencies are listed in `dependencies` or `devDependencies`
-- Your TypeScript compiles without errors locally
+Common deployment failures and solutions:
 
-### Runtime Issues
-
-- Ensure your server exports a default function that returns an MCP server instance
-- Check that your configuration schema matches what users are providing
-- Review the deployment logs in your server's dashboard
+- **Missing module field**: Ensure your `package.json` has the `module` field pointing to your entry point
+- **Dependencies not found**: All dependencies must be listed in `dependencies` or `devDependencies`
+- **Server doesn't build locally**: Before deploying, verify your server builds and runs locally:
+  ```bash
+  npm install
+  npm run build
+  ```
+  If this fails, fix any TypeScript compilation errors or missing dependencies first
