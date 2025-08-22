@@ -32,13 +32,15 @@ CMD ["python", "server.py"]
 ```
 
 ### smithery.yaml
-The smithery.yaml file tells us how to start your server. It should be placed alongside your Dockerfile.
+The smithery.yaml file tells us how to deploy your server. It should be placed alongside your Dockerfile.
 
 ```yaml
-version: 1
-start:
-  command: ["python", "server.py"]
-  port: 8000
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+startCommand:
+  type: "http"
 ```
 
 ## Project Structure

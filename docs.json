@@ -39,7 +39,8 @@
 			{
 				"group": "Cookbooks",
 				"pages": [
-					"cookbooks/typescript_oauth_client"
+					"cookbooks/typescript_oauth_client",
+					"cookbooks/python_custom_container"
 				]
 			},
 			{
@@ -54,7 +55,14 @@
 				"group": "Build MCP Servers",
 				"pages": [
 					"build/index",
-					"build/deployments",
+					{
+						"group": "Deployments",
+						"pages": [
+							"build/deployments/index",
+							"build/deployments/typescript",
+							"build/deployments/custom-container"
+						]
+					},
 					"build/session-config",
 					{
 						"group": "Project Configuration",
@@ -71,10 +79,15 @@
 			{
 				"group": "Migration Guides",
 				"pages": [
-					"migrations/stdio-to-http",
-					"migrations/typescript-with-smithery-cli",
-					"migrations/typescript-custom-container",
-					"migrations/python-custom-container"
+					{
+						"group": "Migrating from STDIO to HTTP",
+						"pages": [
+							"migrations/stdio-to-http",
+							"migrations/typescript-with-smithery-cli",
+							"migrations/typescript-custom-container",
+							"migrations/python-custom-container"
+						]
+					}
 				]
 			},
 			{

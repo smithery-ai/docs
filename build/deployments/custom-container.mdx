@@ -1,0 +1,203 @@
+---
+title: 'Custom Docker Container'
+description: 'Deploy MCP servers using custom Docker containers with full control over your environment.'
+---
+
+## When to Use This Approach
+
+Choose Docker containers when you:
+- Want to use any programming language (not just TypeScript/JavaScript)
+- Need full control over your Docker environment  
+- Have complex system dependencies or requirements
+- Want custom middleware, build processes, or runtime configurations
+- Need specific libraries or tools not available in standard deployments
+
+## Prerequisites
+
+- Docker installed locally
+- Server that implements [MCP Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) transport with `/mcp` endpoint and CORS configuration
+- Server that listens on a configurable `PORT` environment variable (Smithery will set this to 8081)
+- **(Optional)** Server that can optionally handle session configuration passed by Smithery (API keys, settings, etc.) - see our [cookbook](/cookbooks/python_custom_container) for a complete example
+
+<Note>
+**New to custom containers?** See our [Python FastMCP Server cookbook](/cookbooks/python_custom_container) for a complete working example that demonstrates all the requirements above.
+</Note>
+
+## Requirements
+
+Your deployment needs:
+
+- **Dockerfile** - Container configuration file
+- **smithery.yaml** - Project and session configuration
+
+Here's what your project structure should look like:
+
+```
+my-mcp-server/
+  Dockerfile
+  smithery.yaml
+  pyproject.toml     # Dependencies and project config
+  src/
+    main.py          # Your MCP server code
+  README.md
+```
+
+We'll cover how to set up each of these in the sections below.
+
+## Setup
+
+### 1. Create smithery.yaml
+
+The `smithery.yaml` file tells Smithery how to build and run your container, and optionally defines what [session configuration](/build/session-config) your server accepts from users.
+
+Create a `smithery.yaml` file in your repository root:
+
+```yaml
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"           # Path to your Dockerfile
+  dockerBuildPath: "."               # Docker build context
+startCommand:
+  type: "http"
+  configSchema:                      # Optional: JSON Schema for configuration
+    type: "object"
+    properties:
+      apiKey:
+        type: "string"
+        description: "API key for external service"
+    required: ["apiKey"]
+  exampleConfig:                     # Optional: Example configuration
+    apiKey: "your-api-key-here"
+```
+
+<Note>
+**Need more details?** See [Project Configuration](/build/project-config) for complete smithery.yaml options and [Session Configuration](/build/session-config) for handling user settings.
+</Note>
+
+### 2. Create Dockerfile
+
+The Dockerfile defines how to build your container image with all dependencies and runtime configuration. Test it builds locally with `docker build .` before deploying.
+
+Your Dockerfile should:
+- Install dependencies and build your application
+- Handle the `/mcp` endpoint
+- Start your server process
+
+<CodeGroup>
+
+```dockerfile Node.js/TypeScript
+FROM node:22-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build if needed
+RUN npm run build
+
+# Start the server
+CMD ["node", "dist/index.js"]
+```
+
+```dockerfile Python
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+# Copy project config
+COPY pyproject.toml .
+
+# Install dependencies
+RUN uv sync --frozen
+
+# Copy source code
+COPY src/ .
+
+# Start the server
+CMD ["uv", "run", "python", "main.py"]
+```
+
+</CodeGroup>
+
+## Deploy
+
+1. Push your code (including `smithery.yaml` and `Dockerfile`) to GitHub
+2. [Connect your GitHub](https://smithery.ai/new) to Smithery (or claim your server if already listed)
+3. Navigate to the Deployments tab on your server page
+4. Click Deploy to build and host your container
+
+## What Happens Under the Hood
+
+When you deploy, Smithery will:
+
+1. Clone your repository
+2. Parse your `smithery.yaml` to understand how to build and configure your server (Dockerfile path, build context, etc.)
+3. Build your Docker container using the specified Dockerfile
+4. Deploy the container to our hosting infrastructure
+5. Send MCP `initialize` and `list_tools` messages with a dummy configuration (via base64-encoded config parameter in URL) to discover your server's capabilities
+6. Make it available at `https://server.smithery.ai/your-server/mcp`
+7. Handle load balancing, scaling, and monitoring
+
+
+## Troubleshooting
+
+### Why does my deployment fail?
+
+Common deployment failures and solutions:
+
+- **Docker build fails**: Check your Dockerfile syntax and ensure all files are copied correctly
+- **Dependencies not found**: Make sure your package files are copied before installing dependencies
+
+### Why don't my server's capabilities get listed?
+
+If your server's capabilities aren't showing up in Smithery:
+
+- **Port binding issues**: Ensure your server listens on the `PORT` environment variable (Smithery sets this to 8081)
+- **CORS errors**: Configure CORS headers properly for the `/mcp` endpoint
+- **MCP protocol issues**: Ensure your server properly responds to `initialize` and `list_tools` messages
+- **Endpoint not found**: Verify your server exposes the `/mcp` endpoint correctly
+- **Configuration errors**: Check that your server handles the base64-encoded config parameter in the URL
+- **Server crashes**: Review your server logs for runtime errors during tool discovery
+
+### How do I implement session configuration handling in my server?
+
+To handle user configuration (API keys, settings, etc.):
+
+- **Parse the config parameter**: Extract and decode the base64-encoded config from the URL query parameter
+- **Validate configuration**: Check that required fields match your `configSchema` in `smithery.yaml`
+- **Handle missing config**: Gracefully handle cases where no configuration is provided
+- **See our [cookbook](/cookbooks/python_custom_container)** for a complete implementation example
+
+### How do I set up CORS handling?
+
+To properly configure CORS for your MCP server:
+
+- **Allow all origins**: Set `Access-Control-Allow-Origin: *` for the `/mcp` endpoint
+- **Allow credentials**: Set `Access-Control-Allow-Credentials: true`
+- **Allow required methods**: Include `GET, POST, OPTIONS` in `Access-Control-Allow-Methods`
+- **Allow required headers**: Include `Content-Type, Authorization` and all headers with `*` in `Access-Control-Allow-Headers`
+- **Expose MCP headers**: Include `mcp-session-id, mcp-protocol-version` in `Access-Control-Expose-Headers`
+- **Handle preflight requests**: Respond to `OPTIONS` requests with appropriate CORS headers
+- **Example**: See our [cookbook](/cookbooks/python_custom_container) for complete CORS implementation
+
+
+
+## Migration Guides
+
+- [Migrating from STDIO to HTTP](/migrations/stdio-to-http)
+- [TypeScript Custom Container Migration](/migrations/typescript-custom-container)
+- [Python Custom Container Migration](/migrations/python-custom-container)
+
+## Examples
+
+- [Python FastMCP Server with Docker](/cookbooks/python_custom_container) - Complete working example with configuration handling

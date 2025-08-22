@@ -91,7 +91,7 @@ export const configSchema = z.object({
 });
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8081;
 
 // CORS configuration for browser-based MCP clients
 app.use(cors({
@@ -296,6 +296,7 @@ build:
   dockerBuildPath: "."               # Docker build context
 startCommand:
   type: "http"
+  # configSchema and exampleConfig are optional - remove if no configuration needed
   configSchema:                      # Optional: Define configuration schema
     type: object
     required: [apiKey]
@@ -306,7 +307,6 @@ startCommand:
   exampleConfig:                     # Optional: Example configuration
     apiKey: "sk-example-123"
 ```
-
 </CodeGroup>
 
 ### Step 6: Update Dockerfile
@@ -352,10 +352,8 @@ COPY . .
 # Build the TypeScript code
 RUN npm run build
 
-# Set transport mode to HTTP and port to 8080 as required by Smithery proxy
+# Set transport mode to HTTP
 ENV TRANSPORT=http
-ENV PORT=8080
-EXPOSE 8080
 
 # Start the server directly with node
 CMD ["node", "dist/index.js"]
@@ -402,6 +400,10 @@ Configure `package.json` for both HTTP and STDIO workflows:
    docker build -t my-mcp-server .
    docker run -p 8080:8080 -e PORT=8080 my-mcp-server
    ```
+
+<Note>
+**Local vs Deployed Ports**: For local testing, you can use any port (like 8080 above). However, when deployed to Smithery, your server **must** listen on the `PORT` environment variable, which Smithery will set to 8081.
+</Note>
 
 3. **Test interactively:**
    Once your server is running in HTTP mode, you can test it interactively using the Smithery playground:

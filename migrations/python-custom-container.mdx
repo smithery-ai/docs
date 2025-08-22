@@ -144,8 +144,8 @@ def main():
         # Apply custom middleware for config extraction
         app = SmitheryConfigMiddleware(app, handle_config)
 
-        # Get port from environment variable (defaults to 8080)
-        port = int(os.environ.get("PORT", 8080))
+        # Get port from environment variable (Smithery sets this to 8081)
+        port = int(os.environ.get("PORT", 8081))
         print(f"Listening on port {port}")
 
         uvicorn.run(app, host="0.0.0.0", port=port, log_level="debug")
@@ -166,9 +166,13 @@ if __name__ == "__main__":
     main()
 ```
 
-### Step 4: Create Middleware Setup
+### Step 4: Create Middleware Setup (Optional)
 
-Create the middleware for handling Smithery configuration:
+Create the middleware for handling Smithery configuration. **This step is only needed if your MCP server requires configuration** (API keys, settings, etc.):
+
+<Note>
+**Skip this step if no configuration needed**: If your MCP server doesn't need any configuration, you can skip creating this middleware entirely. Simply remove the `SmitheryConfigMiddleware` import and usage from your main.py file, and your server will work perfectly fine without it.
+</Note>
 
 ```python
 # middleware/__init__.py
@@ -239,6 +243,7 @@ build:
   dockerBuildPath: "."               # Docker build context
 startCommand:
   type: "http"
+  # configSchema and exampleConfig are optional - remove if no configuration needed
   configSchema:                      # Optional: Define configuration schema
     type: object
     required: [apiKey]
@@ -249,7 +254,6 @@ startCommand:
   exampleConfig:                     # Optional: Example configuration
     apiKey: "sk-example-123"
 ```
-
 </CodeGroup>
 
 ### Step 6: Update Dockerfile
@@ -322,10 +326,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Set transport mode to HTTP and port to 8080 as required by Smithery proxy
+# Set transport mode to HTTP
 ENV TRANSPORT=http
-ENV PORT=8080
-EXPOSE 8080
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
@@ -358,6 +360,10 @@ CMD ["python", "main.py"]
    docker build -t character-counter .
    docker run -p 8080:8080 -e PORT=8080 character-counter
    ```
+
+<Note>
+**Local vs Deployed Ports**: For local testing, you can use any port (like 8080 above). However, when deployed to Smithery, your server **must** listen on the `PORT` environment variable, which Smithery will set to 8081.
+</Note>
 
 3. **Test interactively:**
    Once your server is running in HTTP mode, you can test it interactively using the Smithery playground:
