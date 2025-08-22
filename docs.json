@@ -79,10 +79,15 @@
 			{
 				"group": "Migration Guides",
 				"pages": [
-					"migrations/stdio-to-http",
-					"migrations/typescript-with-smithery-cli",
-					"migrations/typescript-custom-container",
-					"migrations/python-custom-container"
+					{
+						"group": "Migrating from STDIO to HTTP",
+						"pages": [
+							"migrations/stdio-to-http",
+							"migrations/typescript-with-smithery-cli",
+							"migrations/typescript-custom-container",
+							"migrations/python-custom-container"
+						]
+					}
 				]
 			},
 			{
