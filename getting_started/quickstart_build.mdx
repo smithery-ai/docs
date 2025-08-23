@@ -1,18 +1,15 @@
 ---
-title: "Quickstart: Build an MCP server"
-description: "Build and run a Streamable HTTP MCP server in TypeScript with two lines of code"
+title: "Quickstart: Build your MCP server"
+description: "Build and deploy your first Streamable HTTP MCP server in 10 minutes"
 ---
 
-The easiest way to build an MCP server is to use the TypeScript MCP SDK with the Smithery CLI. For other languages like Python, you can follow our [Python custom container guide](/cookbooks/python_custom_container) to build with FastMCP and Docker.
+![npm create smithery](../images/npm-create-smithery.png)
 
-### Choose your hosting model
-
-- Hosted on Smithery (recommended): Build and deploy on Smithery with CI/CD and a great developer experience.
-- Self-hosted: Already running your MCP elsewhere? Publish it by URL. See [External MCPs](/build/external).
+In this quickstart, we'll build a simple MCP server that says hello to users. You'll learn how to create tools, handle requests, and deploy your server with automatic CI/CD. We'll use the TypeScript MCP SDK with the Smithery CLI for the fastest development experience. For other languages like Python, check out our [Python custom container guide](/cookbooks/python_custom_container).
 
 ### Prerequisites
 
-- Node.js >18 and npm
+- [Node.js](https://nodejs.org/) >18 (includes npm)
 - A [Smithery API key](https://smithery.ai) for development features
 
 ### 1. Initialize Project
@@ -24,8 +21,6 @@ npm create smithery
 ### 2. Edit Your Server
 
 In `src/index.ts`, you'll see a default server that says hello to a given name. Edit it to add your own tools. For more information on the MCP spec, check out the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk?tab=readme-ov-file#quick-start).
-
-Or, you can invoke this server by prompting something like "Say hello to Henry".
 
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -95,7 +90,7 @@ Benefits:
 npm run dev
 ```
 
-This will port-forward your local server to the Smithery Playground via ngrok. You can also reference the [Smithery CLI](https://github.com/smithery-ai/cli) for more controls.
+This will port-forward your local server to the Smithery Playground via ngrok. You can now test your server by prompting something like "Say hello to Henry". You can also reference the [Smithery CLI](https://github.com/smithery-ai/cli) for more controls.
 
 ### 4. Deploy
 
