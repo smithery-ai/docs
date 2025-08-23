@@ -28,7 +28,7 @@ cd smithery-cookbook/servers/python/quickstart
 
 We'll build a simple MCP server with a `say_hello` tool that:
 - Greets users by name
-- Shows proper CORS handling and middleware setup
+- Shows proper CORS handling
 - Supports HTTP transport
 
 ### Prerequisites
@@ -145,9 +145,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
-
-# Set transport mode to HTTP as required by Smithery proxy
-ENV TRANSPORT=http
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []

@@ -7,10 +7,7 @@ description: 'Deploy MCP servers using custom Docker containers with full contro
 
 Choose Docker containers when you:
 - Want to use any programming language (not just TypeScript/JavaScript)
-- Need full control over your Docker environment  
-- Have complex system dependencies or requirements
-- Want custom middleware, build processes, or runtime configurations
-- Need specific libraries or tools not available in standard deployments
+- Need full control over your environment, dependencies, or runtime configuration
 
 For simpler TypeScript/Node.js servers without custom dependencies, consider [TypeScript with Smithery CLI](/build/deployments/typescript) deployment.
 
@@ -18,8 +15,8 @@ For simpler TypeScript/Node.js servers without custom dependencies, consider [Ty
 
 - Docker installed locally
 - Server that implements [MCP Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) transport with `/mcp` endpoint and CORS configuration
-- Server that listens on a configurable `PORT` environment variable (Smithery will set this to 8081)
-- **(Optional)** Server that can optionally handle session configuration passed by Smithery (API keys, settings, etc.) - see our [cookbook](/cookbooks/python_custom_container) for a complete example
+- Server that listens on a configurable `PORT` environment variable (Smithery will set this to 8081 when launching your container)
+- **(Optional)** Server that can handle session configuration passed by Smithery (API keys, settings, etc.) - see our [cookbook](/cookbooks/python_custom_container) for a complete example
 
 <Note>
 **New to custom containers?** See our [Python FastMCP Server cookbook](/cookbooks/python_custom_container) for a complete working example that demonstrates all the requirements above.
