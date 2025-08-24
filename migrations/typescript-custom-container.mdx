@@ -112,7 +112,7 @@ If your server needs configuration (like API keys, user preferences, etc.), add 
 // Define session configuration schema
 export const configSchema = z.object({
   serverToken: z.string().optional().describe("Server access token"),
-  maxTextLength: z.number().optional().default(1000).describe("Maximum text length allowed"),
+  caseSensitive: z.boolean().optional().default(false).describe("Whether character matching should be case sensitive"),
 });
 
 // Parse configuration from query parameters
@@ -163,12 +163,11 @@ export default function createServer({
       }
       
       // Apply user preferences from config
-      if (text.length > config.maxTextLength) {
-        throw new Error(`Text too long. Maximum length is ${config.maxTextLength} characters.`);
-      }
+      const searchText = config.caseSensitive ? text : text.toLowerCase();
+      const searchChar = config.caseSensitive ? character : character.toLowerCase();
       
-      // Count occurrences of the specific character (case insensitive)
-      const count = text.toLowerCase().split(character.toLowerCase()).length - 1;
+      // Count occurrences of the specific character
+      const count = searchText.split(searchChar).length - 1;
 
       return {
         content: [
@@ -200,7 +199,7 @@ app.all('/mcp', async (req: Request, res: Response) => {
     // Validate and parse configuration (only if you added configSchema in Step 2)
     const config = configSchema ? configSchema.parse({
       serverToken: rawConfig.serverToken || process.env.SERVER_TOKEN || undefined,
-      maxTextLength: rawConfig.maxTextLength || 1000,
+      caseSensitive: rawConfig.caseSensitive || false,
     }) : {};
     
     const server = createServer({ config });
@@ -253,13 +252,13 @@ async function main() {
   } else {
     // Optional: if you need backward compatibility, add stdio transport
     const serverToken = process.env.SERVER_TOKEN;
-    const maxTextLength = parseInt(process.env.MAX_TEXT_LENGTH || '1000');
+    const caseSensitive = process.env.CASE_SENSITIVE === 'true';
 
     // Create server with configuration
     const server = createServer({
       config: {
         serverToken,
-        maxTextLength,
+        caseSensitive,
       },
     });
 
@@ -296,7 +295,7 @@ startCommand:
       args: ['dist/index.js'],
       env: {
         SERVER_TOKEN: config.serverToken,
-        MAX_TEXT_LENGTH: config.maxTextLength
+        CASE_SENSITIVE: config.caseSensitive
       }
     })
   configSchema:
@@ -305,13 +304,13 @@ startCommand:
       serverToken:
         type: string
         description: Server access token
-      maxTextLength:
-        type: number
-        description: Maximum text length allowed
-        default: 1000
+      caseSensitive:
+        type: boolean
+        description: Whether character matching should be case sensitive
+        default: false
   exampleConfig:
     serverToken: "your-server-token"
-    maxTextLength: 1000
+    caseSensitive: false
 ```
 
 ```yaml After (HTTP Container)
@@ -328,13 +327,13 @@ startCommand:
       serverToken:
         type: string
         description: Server access token
-      maxTextLength:
-        type: number
-        description: Maximum text length allowed
-        default: 1000
+      caseSensitive:
+        type: boolean
+        description: Whether character matching should be case sensitive
+        default: false
   exampleConfig:                     # Optional: Example configuration
     serverToken: "your-server-token"
-    maxTextLength: 1000
+    caseSensitive: false
 ```
 </CodeGroup>
 
