@@ -52,8 +52,8 @@ const server = new McpServer({
   version: "1.0.0"
 });
 
-// Get API key from environment variable
-const apiKey = process.env.API_KEY;
+// Get server token from environment variable
+const serverToken = process.env.SERVER_TOKEN;
 
 // Register tool
 server.registerTool("count_characters", {
@@ -85,11 +85,6 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-// Define session configuration schema
-export const configSchema = z.object({
-  apiKey: z.string().describe("Your API key"), // for demonstration
-});
-
 const app = express();
 const PORT = process.env.PORT || 8081;
 
@@ -101,6 +96,24 @@ app.use(cors({
 }));
 
 app.use(express.json());
+```
+
+### Step 2: Configuration Handling (Optional)
+
+<Info>
+**Skip this entire step if no configuration needed**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can skip this entire step. Your server will work perfectly fine without any configuration handling.
+</Info>
+
+If your server needs configuration (like API keys, user preferences, etc.), add these configuration handling functions:
+
+```typescript
+// src/index.ts (continued - only add if you need configuration)
+
+// Define session configuration schema
+export const configSchema = z.object({
+  serverToken: z.string().optional().describe("Server access token"),
+  caseSensitive: z.boolean().optional().default(false).describe("Whether character matching should be case sensitive"),
+});
 
 // Parse configuration from query parameters
 function parseConfig(req: Request) {
@@ -111,18 +124,14 @@ function parseConfig(req: Request) {
   return {};
 }
 
-function validateApiKey(apiKey?: string): boolean {
-  // Validate API key - accepts any string including empty ones for demo
-  // Add your own validation logic here
-  return true;
+function validateServerAccess(serverToken?: string): boolean {
+  // Validate server token - accepts any string including empty ones for demo
+  // In a real app, you'd validate against your server's auth system
+  return serverToken !== undefined && serverToken.trim().length > 0 ? true : true;
 }
 ```
 
-<Note>
-**Configuration is Optional**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can remove all the config parsing and validation code. The server will work perfectly fine without it.
-</Note>
-
-### Step 2: Create Server Function and Register Tools
+### Step 3: Create Server Function and Register Tools
 
 Create the server function and register your tools:
 
@@ -148,13 +157,17 @@ export default function createServer({
     },
   },
     async ({ text, character }) => {
-      // Validate API key
-      if (!validateApiKey(config.apiKey)) {
-        throw new Error("API key validation failed");
+      // Validate server access
+      if (!validateServerAccess(config.serverToken)) {
+        throw new Error("Server access validation failed. Please provide a valid serverToken.");
       }
       
-      // Count occurrences of the specific character (case insensitive)
-      const count = text.toLowerCase().split(character.toLowerCase()).length - 1;
+      // Apply user preferences from config
+      const searchText = config.caseSensitive ? text : text.toLowerCase();
+      const searchChar = config.caseSensitive ? character : character.toLowerCase();
+      
+      // Count occurrences of the specific character
+      const count = searchText.split(searchChar).length - 1;
 
       return {
         content: [
@@ -171,7 +184,7 @@ export default function createServer({
 }
 ```
 
-### Step 3: MCP Request Handler
+### Step 4: MCP Request Handler
 
 Handle incoming MCP requests at the `/mcp` endpoint:
 
@@ -180,12 +193,14 @@ Handle incoming MCP requests at the `/mcp` endpoint:
 // Handle MCP requests at /mcp endpoint
 app.all('/mcp', async (req: Request, res: Response) => {
   try {
-    const rawConfig = parseConfig(req);
+    // Parse configuration (only if you added configuration handling in Step 2)
+    const rawConfig = parseConfig ? parseConfig(req) : {};
     
-    // Validate and parse configuration
-    const config = configSchema.parse({
-      apiKey: rawConfig.apiKey || process.env.API_KEY || undefined,
-    });
+    // Validate and parse configuration (only if you added configSchema in Step 2)
+    const config = configSchema ? configSchema.parse({
+      serverToken: rawConfig.serverToken || process.env.SERVER_TOKEN || undefined,
+      caseSensitive: rawConfig.caseSensitive || false,
+    }) : {};
     
     const server = createServer({ config });
     const transport = new StreamableHTTPServerTransport({
@@ -213,7 +228,7 @@ app.all('/mcp', async (req: Request, res: Response) => {
 });
 ```
 
-### Step 4: Maintaining STDIO Compatibility (Optional)
+### Step 5: Maintaining STDIO Compatibility (Optional)
 
 Now that we have our HTTP server ready, we can optionally add STDIO support for backward compatibility. This gives you the best of both worlds:
 
@@ -221,36 +236,40 @@ Now that we have our HTTP server ready, we can optionally add STDIO support for 
 - **Local development**: Keep the familiar STDIO transport for backwards compatibility
 - **NPM distribution**: Publish your server so others can install and run it locally
 
-To enable STDIO support, add a `main()` function:
+To enable STDIO support, add a condition to your `main()` function:
 
 ```typescript
 // src/index.ts
+// Main function to start the server in the appropriate mode
 async function main() {
-  const transport = process.env.TRANSPORT || 'http';
+  const transport = process.env.TRANSPORT || 'stdio';
   
-  if (transport === 'stdio') {
-    // Check if API key is provided
-    const apiKey = process.env.API_KEY || "";
-    
-    // Create server with configuration
-    const server = createServer({
-      config: {
-        apiKey,
-      },
-    });
-
-    const stdioTransport = new StdioServerTransport();
-    await server.connect(stdioTransport);
-    console.error("MCP Server running in stdio mode");
-  } else {
-    // Run in HTTP mode (default)
+  if (transport === 'http') {
+    // Run in HTTP mode
     app.listen(PORT, () => {
       console.log(`MCP HTTP Server listening on port ${PORT}`);
     });
+  } else {
+    // Optional: if you need backward compatibility, add stdio transport
+    const serverToken = process.env.SERVER_TOKEN;
+    const caseSensitive = process.env.CASE_SENSITIVE === 'true';
+
+    // Create server with configuration
+    const server = createServer({
+      config: {
+        serverToken,
+        caseSensitive,
+      },
+    });
+
+    // Start receiving messages on stdin and sending messages on stdout
+    const stdioTransport = new StdioServerTransport();
+    await server.connect(stdioTransport);
+    console.error("MCP Server running in stdio mode");
   }
 }
 
-// By default run the server with HTTP transport
+// Start the server
 main().catch((error) => {
   console.error("Server error:", error);
   process.exit(1);
@@ -263,7 +282,7 @@ main().catch((error) => {
 
 ## Configuration Changes
 
-### Step 5: Update smithery.yaml
+### Step 6: Update smithery.yaml
 
 <CodeGroup>
 
@@ -275,18 +294,23 @@ startCommand:
       command: 'node',
       args: ['dist/index.js'],
       env: {
-        API_KEY: config.apiKey
+        SERVER_TOKEN: config.serverToken,
+        CASE_SENSITIVE: config.caseSensitive
       }
     })
   configSchema:
     type: object
-    required: [apiKey]
     properties:
-      apiKey:
+      serverToken:
         type: string
-        description: Your API key
+        description: Server access token
+      caseSensitive:
+        type: boolean
+        description: Whether character matching should be case sensitive
+        default: false
   exampleConfig:
-    apiKey: "sk-example-123"
+    serverToken: "your-server-token"
+    caseSensitive: false
 ```
 
 ```yaml After (HTTP Container)
@@ -299,17 +323,21 @@ startCommand:
   # configSchema and exampleConfig are optional - remove if no configuration needed
   configSchema:                      # Optional: Define configuration schema
     type: object
-    required: [apiKey]
     properties:
-      apiKey:
+      serverToken:
         type: string
-        description: Your API key
+        description: Server access token
+      caseSensitive:
+        type: boolean
+        description: Whether character matching should be case sensitive
+        default: false
   exampleConfig:                     # Optional: Example configuration
-    apiKey: "sk-example-123"
+    serverToken: "your-server-token"
+    caseSensitive: false
 ```
 </CodeGroup>
 
-### Step 6: Update Dockerfile
+### Step 7: Update Dockerfile
 
 <CodeGroup>
 
@@ -361,7 +389,7 @@ CMD ["node", "dist/index.js"]
 
 </CodeGroup>
 
-### Step 7: Update package.json
+### Step 8: Update package.json
 
 Configure `package.json` for both HTTP and STDIO workflows:
 

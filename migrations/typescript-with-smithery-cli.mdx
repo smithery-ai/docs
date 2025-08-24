@@ -47,8 +47,8 @@ const server = new McpServer({
   version: "1.0.0"
 });
 
-// Get API key from environment variable
-const apiKey = process.env.API_KEY;
+// Get case sensitivity from environment variable
+const caseSensitive = process.env.CASE_SENSITIVE === 'true';
 
 // Register tool
 server.registerTool("count_characters", {
@@ -79,14 +79,8 @@ import { z } from "zod";
 
 // Define session configuration schema
 export const configSchema = z.object({
-  apiKey: z.string().describe("Your API key"), // for demonstration
+  caseSensitive: z.boolean().optional().default(false).describe("Whether character matching should be case sensitive"),
 });
-
-function validateApiKey(apiKey?: string): boolean {
-  // Validate API key - accepts any string including empty ones for demo
-  // Add your own validation logic here
-  return true;
-}
 ```
 
 <Note>
@@ -118,13 +112,12 @@ export default function createServer({
     },
   },
     async ({ text, character }) => {
-      // Validate API key
-      if (!validateApiKey(config.apiKey)) {
-        throw new Error("API key validation failed");
-      }
+      // Apply user preferences from config
+      const searchText = config.caseSensitive ? text : text.toLowerCase();
+      const searchChar = config.caseSensitive ? character : character.toLowerCase();
       
-      // Count occurrences of the specific character (case insensitive)
-      const count = text.toLowerCase().split(character.toLowerCase()).length - 1;
+      // Count occurrences of the specific character
+      const count = searchText.split(searchChar).length - 1;
 
       return {
         content: [
@@ -154,13 +147,13 @@ To enable STDIO support, add a `main()` function at the bottom of your file:
 ```typescript
 // src/index.ts
 async function main() {
-  // Check if API key is provided
-  const apiKey = process.env.API_KEY || "";
+  // Check if case sensitivity is enabled
+  const caseSensitive = process.env.CASE_SENSITIVE === 'true';
   
   // Create server with configuration
   const server = createServer({
     config: {
-      apiKey,
+      caseSensitive,
     },
   });
 
@@ -233,18 +226,18 @@ startCommand:
       command: 'npx',
       args: ['tsx', 'src/index.ts'],
       env: {
-        API_KEY: config.apiKey
+        CASE_SENSITIVE: config.caseSensitive
       }
     })
   configSchema:
     type: object
-    required: [apiKey]
     properties:
-      apiKey:
-        type: string
-        description: Your API key
+      caseSensitive:
+        type: boolean
+        description: Whether character matching should be case sensitive
+        default: false
   exampleConfig:
-    apiKey: "sk-example-123"
+    caseSensitive: false
 ```
 
 ```yaml After (HTTP)
@@ -293,7 +286,7 @@ That's it! The Smithery CLI handles the HTTP transport automatically.
    npm run build:stdio
    
    # Run in STDIO mode
-   API_KEY=your-api-key npm run start:stdio
+   CASE_SENSITIVE=true npm run start:stdio
    ```
 
 ## Deployment
