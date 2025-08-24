@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
 ### Step 1: Update Imports and Setup
 
-Now let's migrate this to work as an HTTP container. Set up your FastMCP server with the necessary imports, configuration handling, and validation:
+Now let's migrate this to work as an HTTP container. Set up your FastMCP server with the necessary imports:
 
 ```python
 # main.py
@@ -93,6 +93,22 @@ from middleware import SmitheryConfigMiddleware
 
 # Initialize MCP server
 mcp = FastMCP(name="Character Counter")
+```
+
+### Step 2: Configuration Handling (Optional)
+
+<Info>
+**Skip this entire step if no configuration needed**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can skip this entire step including the middleware setup. Your server will work perfectly fine without any configuration handling.
+</Info>
+
+If your server needs configuration (like API keys, user preferences, etc.), you'll need both the configuration handling functions and the middleware to extract config from requests.
+
+#### Step 2a: Add Configuration Functions
+
+Add these configuration handling functions to your main.py:
+
+```python
+# main.py (continued - only add if you need configuration)
 
 def handle_config(config: dict):
     """Handle configuration from Smithery - for backwards compatibility with stdio mode."""
@@ -129,11 +145,47 @@ def validate_server_access(server_token: Optional[str]) -> bool:
     return server_token is not None and len(server_token.strip()) > 0 if server_token else True
 ```
 
-<Note>
-**Configuration is Optional**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can remove all the config parsing middleware and validation code. The server will work perfectly fine without it.
-</Note>
+#### Step 2b: Create Middleware Setup
 
-### Step 2: Register Tools
+Create the middleware for handling Smithery configuration:
+
+```python
+# middleware.py
+import json
+import base64
+from urllib.parse import parse_qs, unquote
+
+class SmitheryConfigMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get('type') == 'http':
+            query = scope.get('query_string', b'').decode()
+            
+            if 'config=' in query:
+                try:
+                    config_b64 = unquote(parse_qs(query)['config'][0])
+                    config = json.loads(base64.b64decode(config_b64))
+                    
+                    # Inject full config into request scope for per-request access
+                    scope['smithery_config'] = config
+                except Exception as e:
+                    print(f"SmitheryConfigMiddleware: Error parsing config: {e}")
+                    scope['smithery_config'] = {}
+            else:
+                scope['smithery_config'] = {}
+        
+        await self.app(scope, receive, send)
+```
+
+This middleware:
+- Extracts base64-encoded configuration from URL query parameters
+- Decodes and parses the JSON configuration
+- Stores the config in the request scope for per-request access
+- Provides error handling and logging for debugging
+
+### Step 3: Register Tools
 
 Define your MCP tool:
 
@@ -161,7 +213,7 @@ def count_characters(text: str, character: str) -> str:
     return f'The character "{character}" appears {count} times in the text.'
 ```
 
-### Step 3: Main Function and Server Startup
+### Step 4: Main Function and Server Startup
 
 Handle both HTTP and STDIO transport modes:
 
@@ -212,50 +264,6 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-
-### Step 4: Create Middleware Setup (Optional)
-
-Create the middleware for handling Smithery configuration. **This step is only needed if your MCP server requires configuration** (API keys, settings, etc.):
-
-<Note>
-**Skip this step if no configuration needed**: If your MCP server doesn't need any configuration, you can skip creating this middleware entirely. Simply remove the `SmitheryConfigMiddleware` import and usage from your main.py file, and your server will work perfectly fine without it.
-</Note>
-
-```python
-# middleware.py
-import json
-import base64
-from urllib.parse import parse_qs, unquote
-
-class SmitheryConfigMiddleware:
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope.get('type') == 'http':
-            query = scope.get('query_string', b'').decode()
-            
-            if 'config=' in query:
-                try:
-                    config_b64 = unquote(parse_qs(query)['config'][0])
-                    config = json.loads(base64.b64decode(config_b64))
-                    
-                    # Inject full config into request scope for per-request access
-                    scope['smithery_config'] = config
-                except Exception as e:
-                    print(f"SmitheryConfigMiddleware: Error parsing config: {e}")
-                    scope['smithery_config'] = {}
-            else:
-                scope['smithery_config'] = {}
-        
-        await self.app(scope, receive, send)
-```
-
-This middleware:
-- Extracts base64-encoded configuration from URL query parameters
-- Decodes and parses the JSON configuration
-- Stores the config in the request scope for per-request access
-- Provides error handling and logging for debugging
 
 ## Configuration Changes
 
@@ -424,7 +432,7 @@ CMD ["python", "main.py"]
    ```
 
 <Note>
-**Local vs Deployed Ports**: For local testing, you can use any port (like 8081 above). However, when deployed to Smithery, your server **must** listen on the `PORT` environment variable, which Smithery will set to 8080.
+**Local vs Deployed Ports**: For local testing, you can use any port. However, when deployed to Smithery, your server **must** listen on the `PORT` environment variable, which Smithery will set to 8081.
 </Note>
 
 3. **Test interactively:**
