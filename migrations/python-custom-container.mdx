@@ -266,7 +266,7 @@ if __name__ == "__main__":
 ```
 
 <Note>
-**How it works**: When you deploy with custom containers, your FastMCP server handles HTTP requests directly through the streamable HTTP app. The `main()` function only runs STDIO mode when you execute the file directly (like `python main.py`), giving you STDIO support for local development and backward compatibility.
+**How it works**: When you deploy with custom containers, your FastMCP server handles HTTP requests directly through the streamable HTTP app. The `main()` function only runs STDIO mode when you execute the file directly (like `python src/main.py`), giving you STDIO support for local development and backward compatibility.
 </Note>
 
 ## Configuration Changes
@@ -407,7 +407,7 @@ ENV TRANSPORT=http
 ENTRYPOINT []
 
 # Run the application directly using the venv Python
-CMD ["python", "main.py"]
+CMD ["python", "src/main.py"]
 ```
 
 </CodeGroup>
@@ -426,7 +426,7 @@ CMD ["python", "main.py"]
    uv sync
    
    # Run in HTTP mode
-   TRANSPORT=http uv run python main.py
+   TRANSPORT=http uv run python src/main.py
    ```
 
 2. **Or with Docker:**
