@@ -89,7 +89,7 @@ import uvicorn
 from mcp.server.fastmcp import FastMCP
 from starlette.middleware.cors import CORSMiddleware
 from typing import Optional
-from middleware import SmitheryConfigMiddleware
+from src.middleware import SmitheryConfigMiddleware
 
 # Initialize MCP server
 mcp = FastMCP(name="Character Counter")
@@ -368,7 +368,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENTRYPOINT []
 
 # STDIO servers don't expose ports
-CMD ["python", "main.py"]
+CMD ["python", "src/main.py"]
 ```
 
 ```dockerfile After (HTTP Container)
