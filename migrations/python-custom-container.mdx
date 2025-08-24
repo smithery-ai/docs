@@ -39,7 +39,7 @@ We'll build a simple MCP server with a `count_characters` tool that:
 Here's a typical STDIO-based MCP server that you might be starting with:
 
 ```python
-# main.py
+# src/main.py
 import os
 from mcp.server.fastmcp import FastMCP
 from typing import Optional
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 Now let's migrate this to work as an HTTP container. Set up your FastMCP server with the necessary imports:
 
 ```python
-# main.py
+# src/main.py
 import os
 import uvicorn
 from mcp.server.fastmcp import FastMCP
@@ -108,7 +108,7 @@ If your server needs configuration (like API keys, user preferences, etc.), you'
 Add these configuration handling functions to your main.py:
 
 ```python
-# main.py (continued - only add if you need configuration)
+# src/main.py (continued - only add if you need configuration)
 
 def handle_config(config: dict):
     """Handle configuration from Smithery - for backwards compatibility with stdio mode."""
@@ -150,7 +150,7 @@ def validate_server_access(server_token: Optional[str]) -> bool:
 Create the middleware for handling Smithery configuration:
 
 ```python
-# middleware.py
+# src/middleware.py
 import json
 import base64
 from urllib.parse import parse_qs, unquote
@@ -190,7 +190,7 @@ This middleware:
 Define your MCP tool:
 
 ```python
-# main.py
+# src/main.py
 # MCP Tool - demonstrates per-request config access
 @mcp.tool()
 def count_characters(text: str, character: str) -> str:
@@ -218,7 +218,7 @@ def count_characters(text: str, character: str) -> str:
 Handle both HTTP and STDIO transport modes:
 
 ```python
-# main.py
+# src/main.py
 def main():
     transport_mode = os.getenv("TRANSPORT", "stdio")
     
