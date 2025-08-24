@@ -6,7 +6,7 @@ description: "Migrate your Python MCP servers to Streamable HTTP, with STDIO sup
 ## When to Use This Approach
 
 Choose Python custom containers when you:
-- Prefer to use Python for your MCP server (we hear you!)
+- Prefer to use Python for your MCP server
 - Need full control over your Docker environment
 - Want to use FastMCP with custom middleware
 - Have specific Python dependencies or requirements
@@ -14,7 +14,7 @@ Choose Python custom containers when you:
 <Card
   title="Show me the repo"
   icon="github"
-  href="https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/python/migrate_stdio_to_http/server_with_custom_container"
+  href="https://github.com/smithery-ai/smithery-cookbook/tree/main/servers/python/migrate_stdio_to_http"
 >
   View the fully runnable GitHub repo for this example
 </Card>
@@ -30,9 +30,9 @@ We'll build a simple MCP server with a `count_characters` tool that:
 
 ## Code Migration
 
-<Note>
+<Info>
 **Already have HTTP support?** If your MCP server already supports HTTP transport, you can skip ahead to Step 5: Update smithery.yaml to configure your deployment settings.
-</Note>
+</Info>
 
 ### Let's say you start with this...
 
@@ -42,18 +42,36 @@ Here's a typical STDIO-based MCP server that you might be starting with:
 # main.py
 import os
 from mcp.server.fastmcp import FastMCP
+from typing import Optional
 
 # Create STDIO server
 mcp = FastMCP("Character Counter")
 
-# Get server token from environment variable
+# Get configuration from environment variables
 server_token = os.getenv("SERVER_TOKEN")
+max_length = int(os.getenv("MAX_TEXT_LENGTH", "1000"))
+
+def validate_server_access(server_token: Optional[str]) -> bool:
+    """Validate server token - accepts any string including empty ones for demo."""
+    # In a real app, you'd validate against your server's auth system
+    # For demo purposes, we accept any non-empty token
+    return server_token is not None and len(server_token.strip()) > 0 if server_token else True
 
 @mcp.tool()
 def count_characters(text: str, character: str) -> str:
-    """Your tool implementation here..."""
-    # Tool logic with server token validation, etc.
-    pass
+    """Count occurrences of a specific character in text"""
+    # Validate server access (your custom validation logic)
+    if not validate_server_access(server_token):
+        raise ValueError("Server access validation failed. Please provide a valid serverToken.")
+    
+    # Apply user preferences from config
+    if len(text) > max_length:
+        raise ValueError(f"Text too long. Maximum length is {max_length} characters.")
+    
+    # Count occurrences
+    count = text.lower().count(character.lower())
+    
+    return f'The character "{character}" appears {count} times in the text.'
 
 # Run with STDIO transport
 if __name__ == "__main__":
@@ -78,13 +96,13 @@ mcp = FastMCP(name="Character Counter")
 
 def handle_config(config: dict):
     """Handle configuration from Smithery - for backwards compatibility with stdio mode."""
-    global _stdio_server_token
+    global _server_token
     if server_token := config.get('serverToken'):
-        _stdio_server_token = server_token
+        _server_token = server_token
     # You can handle other session config fields here
 
 # Store server token only for stdio mode (backwards compatibility)
-_stdio_server_token: Optional[str] = None
+_server_token: Optional[str] = None
 
 def get_request_config() -> dict:
     """Get full config from current request context."""
@@ -98,9 +116,6 @@ def get_request_config() -> dict:
             return request.scope.get('smithery_config', {})
     except:
         pass
-    
-    # Fallback to stdio mode config
-    return {"serverToken": _stdio_server_token} if _stdio_server_token else {}
 
 def get_config_value(key: str, default=None):
     """Get a specific config value from current request."""
@@ -128,9 +143,8 @@ Define your MCP tool:
 @mcp.tool()
 def count_characters(text: str, character: str) -> str:
     """Count occurrences of a specific character in text"""
-    # Example: Get config values that users can pass to your server session
+    # Example: Get various config values that users can pass to your server session
     server_token = get_config_value("serverToken")
-    user_name = get_config_value("userName", "User") 
     max_length = get_config_value("maxTextLength", 1000)
     
     # Validate server access (your custom validation logic)
@@ -141,11 +155,10 @@ def count_characters(text: str, character: str) -> str:
     if len(text) > max_length:
         raise ValueError(f"Text too long. Maximum length is {max_length} characters.")
     
-    # Count occurrences (case insensitive)
+    # Count occurrences
     count = text.lower().count(character.lower())
     
-    # Personalized response using config
-    return f'Hello {user_name}! The character "{character}" appears {count} times in the text.'
+    return f'The character "{character}" appears {count} times in the text.'
 ```
 
 ### Step 3: Main Function and Server Startup
@@ -179,7 +192,7 @@ def main():
         app = SmitheryConfigMiddleware(app)
 
         # Use Smithery-required PORT environment variable
-        port = int(os.environ.get("PORT", 8080))
+        port = int(os.environ.get("PORT", 8081))
         print(f"Listening on port {port}")
 
         uvicorn.run(app, host="0.0.0.0", port=port, log_level="debug")
@@ -209,7 +222,7 @@ Create the middleware for handling Smithery configuration. **This step is only n
 </Note>
 
 ```python
-# middleware/__init__.py
+# middleware.py
 import json
 import base64
 from urllib.parse import parse_qs, unquote
@@ -226,11 +239,15 @@ class SmitheryConfigMiddleware:
                 try:
                     config_b64 = unquote(parse_qs(query)['config'][0])
                     config = json.loads(base64.b64decode(config_b64))
-                    # Store config in request scope for per-request access
+                    
+                    # Inject full config into request scope for per-request access
                     scope['smithery_config'] = config
-                    print(f"SmitheryConfigMiddleware: Extracted config: {list(config.keys())}")
                 except Exception as e:
                     print(f"SmitheryConfigMiddleware: Error parsing config: {e}")
+                    scope['smithery_config'] = {}
+            else:
+                scope['smithery_config'] = {}
+        
         await self.app(scope, receive, send)
 ```
 
@@ -255,7 +272,8 @@ startCommand:
       command: 'python',
       args: ['server.py'],
       env: {
-        SERVER_TOKEN: config.serverToken
+        SERVER_TOKEN: config.serverToken,
+        MAX_TEXT_LENGTH: config.maxTextLength
       }
     })
   configSchema:
@@ -265,17 +283,12 @@ startCommand:
       serverToken:
         type: string
         description: Your server token
-      userName:
-        type: string
-        description: User name for personalized responses
-        default: "User"
       maxTextLength:
         type: integer
         description: Maximum allowed text length
         default: 1000
   exampleConfig:
     serverToken: "token-123"
-    userName: "John"
     maxTextLength: 1000
 ```
 
@@ -295,17 +308,12 @@ startCommand:
       serverToken:
         type: string
         description: Your server token
-      userName:
-        type: string
-        description: User name for personalized responses
-        default: "User"
       maxTextLength:
         type: integer
         description: Maximum allowed text length
         default: 1000
   exampleConfig:                     # Optional: Example configuration
     serverToken: "token-123"
-    userName: "John"
     maxTextLength: 1000
 ```
 </CodeGroup>
@@ -412,17 +420,17 @@ CMD ["python", "main.py"]
 2. **Or with Docker:**
    ```bash
    docker build -t character-counter .
-   docker run -p 8080:8080 -e PORT=8080 character-counter
+   docker run -p 8081:8081 -e PORT=8081 character-counter
    ```
 
 <Note>
-**Local vs Deployed Ports**: For local testing, you can use any port (like 8080 above). However, when deployed to Smithery, your server **must** listen on the `PORT` environment variable, which Smithery will set to 8080.
+**Local vs Deployed Ports**: For local testing, you can use any port (like 8081 above). However, when deployed to Smithery, your server **must** listen on the `PORT` environment variable, which Smithery will set to 8080.
 </Note>
 
 3. **Test interactively:**
    Once your server is running in HTTP mode, you can test it interactively using the Smithery playground:
    ```bash
-   npx @smithery/cli playground --port 8080
+   npx @smithery/cli playground --port 8081
    ```
 
    <img
