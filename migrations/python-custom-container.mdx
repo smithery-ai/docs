@@ -265,6 +265,10 @@ if __name__ == "__main__":
     main()
 ```
 
+<Note>
+**How it works**: When you deploy with custom containers, your FastMCP server handles HTTP requests directly through the streamable HTTP app. The `main()` function only runs STDIO mode when you execute the file directly (like `python main.py`), giving you STDIO support for local development and backward compatibility.
+</Note>
+
 ## Configuration Changes
 
 ### Step 5: Update smithery.yaml

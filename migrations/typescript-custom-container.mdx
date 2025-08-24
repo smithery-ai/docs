@@ -85,11 +85,6 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-// Define session configuration schema
-export const configSchema = z.object({
-  apiKey: z.string().describe("Your API key"), // for demonstration
-});
-
 const app = express();
 const PORT = process.env.PORT || 8081;
 
@@ -101,6 +96,23 @@ app.use(cors({
 }));
 
 app.use(express.json());
+```
+
+### Step 2: Configuration Handling (Optional)
+
+<Info>
+**Skip this entire step if no configuration needed**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can skip this entire step. Your server will work perfectly fine without any configuration handling.
+</Info>
+
+If your server needs configuration (like API keys, user preferences, etc.), add these configuration handling functions:
+
+```typescript
+// src/index.ts (continued - only add if you need configuration)
+
+// Define session configuration schema
+export const configSchema = z.object({
+  apiKey: z.string().describe("Your API key"), // for demonstration
+});
 
 // Parse configuration from query parameters
 function parseConfig(req: Request) {
@@ -118,11 +130,7 @@ function validateApiKey(apiKey?: string): boolean {
 }
 ```
 
-<Note>
-**Configuration is Optional**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can remove all the config parsing and validation code. The server will work perfectly fine without it.
-</Note>
-
-### Step 2: Create Server Function and Register Tools
+### Step 3: Create Server Function and Register Tools
 
 Create the server function and register your tools:
 
@@ -148,8 +156,8 @@ export default function createServer({
     },
   },
     async ({ text, character }) => {
-      // Validate API key
-      if (!validateApiKey(config.apiKey)) {
+      // Validate API key (only if you added configuration handling in Step 2)
+      if (config.apiKey && !validateApiKey(config.apiKey)) {
         throw new Error("API key validation failed");
       }
       
@@ -171,7 +179,7 @@ export default function createServer({
 }
 ```
 
-### Step 3: MCP Request Handler
+### Step 4: MCP Request Handler
 
 Handle incoming MCP requests at the `/mcp` endpoint:
 
@@ -180,12 +188,13 @@ Handle incoming MCP requests at the `/mcp` endpoint:
 // Handle MCP requests at /mcp endpoint
 app.all('/mcp', async (req: Request, res: Response) => {
   try {
-    const rawConfig = parseConfig(req);
+    // Parse configuration (only if you added configuration handling in Step 2)
+    const rawConfig = parseConfig ? parseConfig(req) : {};
     
-    // Validate and parse configuration
-    const config = configSchema.parse({
+    // Validate and parse configuration (only if you added configSchema in Step 2)
+    const config = configSchema ? configSchema.parse({
       apiKey: rawConfig.apiKey || process.env.API_KEY || undefined,
-    });
+    }) : {};
     
     const server = createServer({ config });
     const transport = new StreamableHTTPServerTransport({
@@ -213,7 +222,7 @@ app.all('/mcp', async (req: Request, res: Response) => {
 });
 ```
 
-### Step 4: Maintaining STDIO Compatibility (Optional)
+### Step 5: Maintaining STDIO Compatibility (Optional)
 
 Now that we have our HTTP server ready, we can optionally add STDIO support for backward compatibility. This gives you the best of both worlds:
 
@@ -263,7 +272,7 @@ main().catch((error) => {
 
 ## Configuration Changes
 
-### Step 5: Update smithery.yaml
+### Step 6: Update smithery.yaml
 
 <CodeGroup>
 
@@ -309,7 +318,7 @@ startCommand:
 ```
 </CodeGroup>
 
-### Step 6: Update Dockerfile
+### Step 7: Update Dockerfile
 
 <CodeGroup>
 
@@ -361,7 +370,7 @@ CMD ["node", "dist/index.js"]
 
 </CodeGroup>
 
-### Step 7: Update package.json
+### Step 8: Update package.json
 
 Configure `package.json` for both HTTP and STDIO workflows:
 
