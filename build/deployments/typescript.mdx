@@ -117,6 +117,47 @@ This opens the **Smithery interactive playground** where you can:
 - Validate your configuration schema
 - Experiment with different inputs
 
+## Advanced Build Configuration
+
+For advanced use cases, you can customize the build process using a `smithery.config.js` file. This is useful for:
+
+- Marking packages as external (to avoid bundling issues)
+- Configuring minification, targets, and other build options
+- Adding custom esbuild plugins
+
+### Configuration File
+
+Create `smithery.config.js` in your project root:
+
+```javascript
+export default {
+  esbuild: {
+    // Mark problematic packages as external
+    external: ["playwright-core", "puppeteer-core"],
+
+    // Enable minification for production
+    minify: true,
+
+    // Set Node.js target version
+    target: "node18",
+  },
+};
+```
+
+### Common Use Cases
+
+**External Dependencies**: If you encounter bundling issues with packages like Playwright or native modules:
+
+```javascript
+export default {
+  esbuild: {
+    external: ["playwright-core", "sharp", "@grpc/grpc-js"],
+  },
+};
+```
+
+Configuration applies to both `build` and `dev` commands.
+
 ## Deploy
 
 1. Push your code (including `smithery.yaml`) to GitHub
