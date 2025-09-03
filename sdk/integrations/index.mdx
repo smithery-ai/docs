@@ -1,0 +1,343 @@
+---
+title: "Integrations"
+description: "Connect Smithery MCP servers with Vercel AI SDK and LLM providers"
+---
+
+The Smithery SDK provides seamless integrations with popular AI frameworks and LLM providers, allowing you to expose MCP tools to AI applications.
+
+## Available Integrations
+
+<CardGroup>
+  <Card
+    title="Vercel AI SDK"
+    icon="robot"
+    href="/sdk/integrations/ai-sdk"
+  >
+    Integrate MCP tools with Vercel's AI SDK
+  </Card>
+  <Card
+    title="LLM Providers"
+    icon="brain"
+    href="/sdk/integrations/llm-providers"
+  >
+    Connect to OpenAI, Anthropic, and more
+  </Card>
+</CardGroup>
+
+## Overview
+
+MCP tools can be exposed to AI applications through various integration patterns:
+
+1. **Direct Integration** - Use MCP tools directly in AI applications
+2. **Tool Conversion** - Convert MCP tools to AI SDK format
+3. **Provider Wrappers** - Wrap LLM providers with MCP capabilities
+
+## Quick Example
+
+### Vercel AI SDK Integration
+
+```typescript
+import { createTransport } from "@smithery/sdk"
+import { watchTools } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
+
+// Connect to MCP server
+const transport = createTransport("weather-api.smithery.ai")
+const client = new Client({ name: "ai-app", version: "1.0.0" })
+await client.connect(transport)
+
+// Watch for tool changes
+const tools = await watchTools(client)
+
+// Use with AI SDK
+const result = await generateText({
+  model: openai("gpt-4"),
+  prompt: "What's the weather in San Francisco?",
+  tools  // MCP tools automatically available
+})
+```
+
+### Direct Tool Usage
+
+```typescript
+// List available MCP tools
+const availableTools = await client.listTools()
+console.log("Available tools:", availableTools)
+
+// Call MCP tool directly
+const weather = await client.callTool("get_weather", {
+  city: "San Francisco"
+})
+```
+
+## Integration Patterns
+
+### 1. Tool Discovery
+
+Automatically discover and use MCP tools:
+
+```typescript
+import { listTools } from "@smithery/sdk"
+
+async function discoverTools(client: Client) {
+  // Get current tools
+  const tools = await listTools(client)
+  
+  // Tools are automatically formatted for AI SDK
+  return tools
+}
+```
+
+### 2. Dynamic Tool Loading
+
+Tools that update based on server changes:
+
+```typescript
+import { watchTools } from "@smithery/sdk"
+
+// Tools automatically update when server changes
+const tools = await watchTools(client)
+
+// Set up notification handler for changes
+client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
+  console.log("Tools updated!")
+  // Re-fetch tools or update UI
+})
+```
+
+### 3. Error Handling
+
+Patch the client so tool errors are returned as `isError` results instead of thrown exceptions:
+
+```typescript
+import { wrapError } from "@smithery/sdk"
+
+const client = wrapError(new Client({ name: "ai-app", version: "1.0.0" }))
+await client.connect(transport)
+
+// Now callTool returns { isError: true, content: [...] } on failures
+const result = await client.callTool({ name: "process_data", arguments: { data } })
+if (result.isError) {
+  console.error("Tool failed:", result.content)
+}
+```
+
+## Provider-Specific Integration
+
+### OpenAI Function Calling
+
+```typescript
+import { openai } from "@ai-sdk/openai"
+import { generateText } from "ai"
+
+const tools = await watchTools(client)
+
+const result = await generateText({
+  model: openai("gpt-4"),
+  messages: [
+    { role: "user", content: "Analyze the sales data" }
+  ],
+  tools,
+  toolChoice: "auto"  // Let model decide which tools to use
+})
+```
+
+### Anthropic Tool Use
+
+```typescript
+import { anthropic } from "@ai-sdk/anthropic"
+
+const tools = await watchTools(client)
+
+const result = await generateText({
+  model: anthropic("claude-3-opus"),
+  messages: [
+    { role: "user", content: "Search for recent AI papers" }
+  ],
+  tools,
+  toolChoice: { type: "tool", toolName: "search_papers" }
+})
+```
+
+## Advanced Patterns
+
+### Tool Filtering
+
+Filter tools based on capabilities:
+
+```typescript
+const allTools = await listTools(client)
+
+// Filter tools by category
+const searchTools = Object.fromEntries(
+  Object.entries(allTools).filter(([name, tool]) =>
+    name.includes("search") || tool.description.includes("search")
+  )
+)
+
+// Use filtered tools
+const result = await generateText({
+  model: openai("gpt-4"),
+  tools: searchTools,
+  prompt: "Find information about quantum computing"
+})
+```
+
+### Tool Composition
+
+Combine multiple MCP servers:
+
+```typescript
+// Connect to multiple servers
+const weatherClient = await connectToServer("weather.smithery.ai")
+const searchClient = await connectToServer("search.smithery.ai")
+const dbClient = await connectToServer("database.smithery.ai")
+
+// Combine tools
+const allTools = {
+  ...await listTools(weatherClient),
+  ...await listTools(searchClient),
+  ...await listTools(dbClient)
+}
+
+// Use combined tools
+const result = await generateText({
+  model: openai("gpt-4"),
+  tools: allTools,
+  prompt: "What's the weather for cities in our customer database?"
+})
+```
+
+### Streaming Responses
+
+Handle streaming tool responses:
+
+```typescript
+const stream = await generateTextStream({
+  model: openai("gpt-4"),
+  tools,
+  prompt: "Generate a report using the data"
+})
+
+for await (const chunk of stream) {
+  if (chunk.type === "tool-result") {
+    console.log("Tool called:", chunk.toolName)
+    console.log("Result:", chunk.result)
+  } else if (chunk.type === "text-delta") {
+    process.stdout.write(chunk.textDelta)
+  }
+}
+```
+
+## Best Practices
+
+1. **Cache tool definitions** - Avoid re-fetching unchanged tools
+2. **Handle tool updates** - Use `watchTools` for dynamic servers
+3. **Error gracefully** - Wrap MCP errors for AI SDK compatibility
+4. **Filter appropriately** - Only expose relevant tools to the model
+5. **Monitor usage** - Track which tools are called most frequently
+
+## Common Use Cases
+
+### 1. Augmented Chatbots
+
+```typescript
+// Chatbot with access to company tools
+const tools = await watchTools(mcpClient)
+
+async function handleUserMessage(message: string) {
+  const response = await generateText({
+    model: openai("gpt-4"),
+    tools,
+    messages: [
+      { role: "system", content: "You are a helpful assistant with access to company tools." },
+      { role: "user", content: message }
+    ]
+  })
+  
+  return response.text
+}
+```
+
+### 2. Automated Workflows
+
+```typescript
+// Workflow automation with MCP tools
+async function runWorkflow(task: string) {
+  const tools = await listTools(mcpClient)
+  
+  const plan = await generateObject({
+    model: openai("gpt-4"),
+    schema: z.object({
+      steps: z.array(z.object({
+        tool: z.string(),
+        arguments: z.record(z.any()),
+        description: z.string()
+      }))
+    }),
+    prompt: `Plan how to: ${task}`
+  })
+  
+  // Execute plan
+  for (const step of plan.object.steps) {
+    const result = await mcpClient.callTool(step.tool, step.arguments)
+    console.log(`✓ ${step.description}`)
+  }
+}
+```
+
+### 3. Data Analysis Assistant
+
+```typescript
+// AI assistant with data tools
+const tools = {
+  ...await listTools(databaseClient),
+  ...await listTools(analyticsClient),
+  ...await listTools(visualizationClient)
+}
+
+async function analyzeData(query: string) {
+  return generateText({
+    model: anthropic("claude-3-opus"),
+    tools,
+    prompt: `Analyze and visualize: ${query}`,
+    toolChoice: "required"  // Must use tools
+  })
+}
+```
+
+## Troubleshooting
+
+### Tools Not Appearing
+
+```typescript
+// Debug tool discovery
+const tools = await client.listTools()
+console.log("Raw MCP tools:", tools)
+
+const aiTools = await listTools(client)
+console.log("Converted AI tools:", Object.keys(aiTools))
+```
+
+### Tool Execution Errors
+
+```typescript
+try {
+  const result = await client.callTool("my_tool", args)
+} catch (error) {
+  if (error.code === "TOOL_NOT_FOUND") {
+    // Re-fetch tools
+    const tools = await watchTools(client)
+  } else if (error.code === "INVALID_PARAMS") {
+    console.error("Tool parameters:", error.details)
+  }
+}
+```
+
+## Related
+
+- [AI SDK integration guide](/sdk/integrations/ai-sdk) - Detailed Vercel AI SDK integration
+- [LLM provider setup](/sdk/integrations/llm-providers) - Provider-specific configuration
+- [Client documentation](/sdk/client) - MCP client setup

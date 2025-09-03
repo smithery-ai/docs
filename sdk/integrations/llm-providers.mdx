@@ -1,0 +1,447 @@
+---
+title: "LLM Provider Integration"
+description: "Connect MCP tools to OpenAI, Anthropic, and other LLM providers"
+---
+
+The Smithery SDK includes integration modules for popular LLM providers, enabling seamless use of MCP tools with different AI models.
+
+## Available Providers
+
+### OpenAI Integration
+
+Located at `@smithery/sdk/client/integrations/llm/openai`:
+
+```typescript
+import { OpenAIChatAdapter } from "@smithery/sdk/client/integrations/llm/openai"
+
+const openaiAdapter = new OpenAIChatAdapter(client)
+const openaiTools = await openaiAdapter.listTools()
+// ... call your OpenAI client, then pass the response to:
+const toolMessages = await openaiAdapter.callTool(completion)
+```
+
+### Anthropic Integration  
+
+Located at `@smithery/sdk/client/integrations/llm/anthropic`:
+
+```typescript
+import { AnthropicChatAdapter } from "@smithery/sdk/client/integrations/llm/anthropic"
+
+const anthropicAdapter = new AnthropicChatAdapter(client)
+const tools = await anthropicAdapter.listTools()
+// ... call Anthropic, then pass the message to:
+const toolResults = await anthropicAdapter.callTool(response)
+```
+
+## Integration Patterns
+
+### Direct Provider Usage
+
+Use MCP tools directly with provider SDKs:
+
+```typescript
+import OpenAI from "openai"
+import { createTransport } from "@smithery/sdk"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+
+// Setup MCP client
+const transport = createTransport("tools.smithery.ai")
+const mcpClient = new Client({ name: "openai-app", version: "1.0.0" })
+await mcpClient.connect(transport)
+
+// Get available tools
+const tools = await mcpClient.listTools()
+
+// Setup OpenAI with MCP tools
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
+
+// Convert MCP tools to OpenAI format
+const openaiTools = tools.tools.map(tool => ({
+  type: "function" as const,
+  function: {
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.inputSchema
+  }
+}))
+
+// Use with OpenAI
+const completion = await openai.chat.completions.create({
+  model: "gpt-4",
+  messages: [
+    { role: "user", content: "What's the weather in NYC?" }
+  ],
+  tools: openaiTools,
+  tool_choice: "auto"
+})
+
+// Handle tool calls
+if (completion.choices[0].message.tool_calls) {
+  for (const toolCall of completion.choices[0].message.tool_calls) {
+    const result = await mcpClient.callTool(
+      toolCall.function.name,
+      JSON.parse(toolCall.function.arguments)
+    )
+    console.log("Tool result:", result)
+  }
+}
+```
+
+### Anthropic Tool Use
+
+```typescript
+import Anthropic from "@anthropic-ai/sdk"
+
+// Setup Anthropic client
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+})
+
+// Convert MCP tools to Anthropic format
+const anthropicTools = tools.tools.map(tool => ({
+  name: tool.name,
+  description: tool.description,
+  input_schema: tool.inputSchema
+}))
+
+// Use with Claude
+const response = await anthropic.messages.create({
+  model: "claude-3-opus-20240229",
+  max_tokens: 1000,
+  messages: [
+    { role: "user", content: "Analyze the sales data from last quarter" }
+  ],
+  tools: anthropicTools
+})
+
+// Handle tool use
+if (response.content[0].type === "tool_use") {
+  const toolUse = response.content[0]
+  const result = await mcpClient.callTool(
+    toolUse.name,
+    toolUse.input
+  )
+}
+```
+
+## Unified Interface
+
+Create a unified interface for multiple providers:
+
+```typescript
+interface LLMProvider {
+  name: string
+  callWithTools(prompt: string, tools: any[]): Promise<any>
+}
+
+class OpenAIProvider implements LLMProvider {
+  name = "openai"
+  
+  constructor(private openai: OpenAI, private mcpClient: Client) {}
+  
+  async callWithTools(prompt: string, mcpTools: any[]) {
+    const tools = mcpTools.map(tool => ({
+      type: "function" as const,
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.inputSchema
+      }
+    }))
+    
+    const completion = await this.openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [{ role: "user", content: prompt }],
+      tools
+    })
+    
+    // Process tool calls
+    const toolCalls = completion.choices[0].message.tool_calls || []
+    const results = []
+    
+    for (const call of toolCalls) {
+      const result = await this.mcpClient.callTool(
+        call.function.name,
+        JSON.parse(call.function.arguments)
+      )
+      results.push(result)
+    }
+    
+    return {
+      text: completion.choices[0].message.content,
+      toolResults: results
+    }
+  }
+}
+
+class AnthropicProvider implements LLMProvider {
+  name = "anthropic"
+  
+  constructor(private anthropic: Anthropic, private mcpClient: Client) {}
+  
+  async callWithTools(prompt: string, mcpTools: any[]) {
+    const tools = mcpTools.map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.inputSchema
+    }))
+    
+    const response = await this.anthropic.messages.create({
+      model: "claude-3-opus-20240229",
+      max_tokens: 1000,
+      messages: [{ role: "user", content: prompt }],
+      tools
+    })
+    
+    // Process tool use
+    const results = []
+    for (const content of response.content) {
+      if (content.type === "tool_use") {
+        const result = await this.mcpClient.callTool(
+          content.name,
+          content.input
+        )
+        results.push(result)
+      }
+    }
+    
+    return {
+      text: response.content.find(c => c.type === "text")?.text,
+      toolResults: results
+    }
+  }
+}
+```
+
+## Streaming with Tool Calls
+
+### OpenAI Streaming
+
+```typescript
+const stream = await openai.chat.completions.create({
+  model: "gpt-4",
+  messages: [{ role: "user", content: "Analyze data and create a report" }],
+  tools: openaiTools,
+  stream: true
+})
+
+let toolCalls: any[] = []
+
+for await (const chunk of stream) {
+  // Handle text chunks
+  if (chunk.choices[0]?.delta?.content) {
+    process.stdout.write(chunk.choices[0].delta.content)
+  }
+  
+  // Accumulate tool calls
+  if (chunk.choices[0]?.delta?.tool_calls) {
+    for (const toolCall of chunk.choices[0].delta.tool_calls) {
+      if (!toolCalls[toolCall.index]) {
+        toolCalls[toolCall.index] = {
+          id: toolCall.id,
+          function: { name: "", arguments: "" }
+        }
+      }
+      
+      if (toolCall.function?.name) {
+        toolCalls[toolCall.index].function.name = toolCall.function.name
+      }
+      
+      if (toolCall.function?.arguments) {
+        toolCalls[toolCall.index].function.arguments += toolCall.function.arguments
+      }
+    }
+  }
+}
+
+// Execute accumulated tool calls
+for (const toolCall of toolCalls) {
+  if (toolCall) {
+    const result = await mcpClient.callTool(
+      toolCall.function.name,
+      JSON.parse(toolCall.function.arguments)
+    )
+    console.log(`\nTool ${toolCall.function.name} result:`, result)
+  }
+}
+```
+
+## Error Handling
+
+### Provider-Specific Error Handling
+
+```typescript
+import { wrapError } from "@smithery/sdk"
+
+async function callWithErrorHandling(provider: LLMProvider, prompt: string) {
+  try {
+    return await provider.callWithTools(prompt, tools)
+  } catch (error) {
+    if (error.code === "rate_limit_exceeded") {
+      // Handle rate limiting
+      await new Promise(resolve => setTimeout(resolve, 60000))
+      return callWithErrorHandling(provider, prompt)
+    }
+    
+    if (error.code === "invalid_api_key") {
+      throw new Error("Please check your API key configuration")
+    }
+    
+    // Wrap other errors
+    throw wrapError(error)
+  }
+}
+```
+
+### Tool Execution Errors
+
+```typescript
+async function executeToolSafely(client: Client, name: string, args: any) {
+  try {
+    return await client.callTool(name, args)
+  } catch (error) {
+    console.error(`Tool ${name} failed:`, error)
+    
+    // Return error as tool result
+    return {
+      content: [{
+        type: "text",
+        text: `Error executing ${name}: ${error.message}`
+      }]
+    }
+  }
+}
+```
+
+## Provider Comparison
+
+| Feature | OpenAI | Anthropic | Notes |
+|---------|---------|-----------|-------|
+| Tool format | Functions | Tools | Different schema structure |
+| Streaming | ✅ Full support | ✅ Full support | Both support streaming with tools |
+| Parallel calls | ✅ Yes | ✅ Yes | Can call multiple tools |
+| Error handling | Detailed | Detailed | Both provide good error info |
+
+## Best Practices
+
+### 1. Abstract Provider Details
+
+```typescript
+class LLMService {
+  private providers: Map<string, LLMProvider> = new Map()
+  
+  registerProvider(provider: LLMProvider) {
+    this.providers.set(provider.name, provider)
+  }
+  
+  async query(prompt: string, options: { provider?: string } = {}) {
+    const providerName = options.provider || "openai"
+    const provider = this.providers.get(providerName)
+    
+    if (!provider) {
+      throw new Error(`Unknown provider: ${providerName}`)
+    }
+    
+    const tools = await this.mcpClient.listTools()
+    return provider.callWithTools(prompt, tools.tools)
+  }
+}
+```
+
+### 2. Cache Tool Definitions
+
+```typescript
+class CachedMCPClient {
+  private toolCache: any[] = null
+  private cacheTime: number = 0
+  private cacheDuration = 60000 // 1 minute
+  
+  constructor(private client: Client) {}
+  
+  async getTools() {
+    const now = Date.now()
+    
+    if (!this.toolCache || now - this.cacheTime > this.cacheDuration) {
+      const result = await this.client.listTools()
+      this.toolCache = result.tools
+      this.cacheTime = now
+    }
+    
+    return this.toolCache
+  }
+}
+```
+
+### 3. Handle Provider Limits
+
+```typescript
+class RateLimitedProvider {
+  private callCount = 0
+  private resetTime = Date.now() + 60000
+  private maxCalls = 60
+  
+  async call(fn: () => Promise<any>) {
+    const now = Date.now()
+    
+    if (now > this.resetTime) {
+      this.callCount = 0
+      this.resetTime = now + 60000
+    }
+    
+    if (this.callCount >= this.maxCalls) {
+      const waitTime = this.resetTime - now
+      throw new Error(`Rate limit exceeded. Wait ${waitTime}ms`)
+    }
+    
+    this.callCount++
+    return fn()
+  }
+}
+```
+
+## Testing
+
+### Mock Provider for Testing
+
+```typescript
+class MockLLMProvider implements LLMProvider {
+  name = "mock"
+  
+  constructor(
+    private responses: Map<string, any>,
+    private mcpClient: Client
+  ) {}
+  
+  async callWithTools(prompt: string, tools: any[]) {
+    // Return predefined response
+    const response = this.responses.get(prompt) || {
+      text: "Mock response",
+      shouldCallTool: true,
+      toolName: tools[0]?.name,
+      toolArgs: {}
+    }
+    
+    const toolResults = []
+    if (response.shouldCallTool && response.toolName) {
+      const result = await this.mcpClient.callTool(
+        response.toolName,
+        response.toolArgs
+      )
+      toolResults.push(result)
+    }
+    
+    return {
+      text: response.text,
+      toolResults
+    }
+  }
+}
+```
+
+## Related
+
+- [AI SDK integration](/sdk/integrations/ai-sdk) - Vercel AI SDK specifics
+- [Integration overview](/sdk/integrations) - All integration options
+- [Error handling](/sdk/patterns/errors) - Error wrapping utilities
