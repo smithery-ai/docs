@@ -1,0 +1,335 @@
+---
+title: "patch"
+description: "Utility for safely patching object methods with custom behavior"
+---
+
+The `patch` function provides a type-safe way to wrap or replace methods on objects, commonly used for adding middleware, logging, or error handling to existing functions.
+
+## Function Signature
+
+```typescript
+// Overload 1: Required function property
+function patch<
+  T extends { [P in K]: (...args: any[]) => any },
+  K extends keyof T & string
+>(obj: T, key: K, patcher: (fn: T[K]) => T[K]): void
+
+// Overload 2: Optional function property
+function patch<
+  T extends { [P in K]?: (...args: any[]) => any },
+  K extends keyof T & string
+>(obj: T, key: K, patcher: (fn?: T[K]) => T[K]): void
+```
+
+## Parameters
+
+### `obj`
+- **Type**: `T` (object with method to patch)
+- **Required**: Yes
+- **Description**: The object containing the method to patch
+
+### `key`
+- **Type**: `K extends keyof T & string`
+- **Required**: Yes
+- **Description**: The name of the method to patch on the object
+
+### `patcher`
+- **Type**: `(fn: T[K]) => T[K]` or `(fn?: T[K]) => T[K]`
+- **Required**: Yes
+- **Description**: Function that receives the original method and returns the patched version
+
+## How It Works
+
+1. **Preserves context**: Binds the original function to its object to maintain `this` context
+2. **Handles missing methods**: Safely handles cases where the method doesn't exist (passes `undefined`)
+3. **Type-safe**: Provides TypeScript overloads for required and optional methods
+4. **In-place modification**: Directly modifies the object's method
+
+## Usage Examples
+
+### Basic Method Wrapping
+
+```typescript
+import { patch } from "@smithery/sdk"
+
+class Calculator {
+  add(a: number, b: number): number {
+    return a + b
+  }
+}
+
+const calc = new Calculator()
+
+// Add logging to the add method
+patch(calc, "add", (originalAdd) => {
+  return function(a: number, b: number): number {
+    console.log(`Adding ${a} + ${b}`)
+    const result = originalAdd(a, b)
+    console.log(`Result: ${result}`)
+    return result
+  }
+})
+
+calc.add(2, 3) 
+// Output: Adding 2 + 3
+// Output: Result: 5
+// Returns: 5
+```
+
+### Error Handling Wrapper
+
+```typescript
+import { patch } from "@smithery/sdk"
+
+class APIClient {
+  async fetchData(id: string): Promise<any> {
+    const response = await fetch(`/api/data/${id}`)
+    return response.json()
+  }
+}
+
+const client = new APIClient()
+
+// Add error handling
+patch(client, "fetchData", (originalFetch) => {
+  return async function(id: string): Promise<any> {
+    try {
+      return await originalFetch(id)
+    } catch (error) {
+      console.error(`Failed to fetch data for ${id}:`, error)
+      return { error: true, message: error.message }
+    }
+  }
+})
+```
+
+### Performance Monitoring
+
+```typescript
+import { patch } from "@smithery/sdk"
+
+class DataProcessor {
+  processLargeDataset(data: any[]): any[] {
+    // Complex processing logic
+    return data.map(item => transform(item))
+  }
+}
+
+const processor = new DataProcessor()
+
+// Add performance monitoring
+patch(processor, "processLargeDataset", (original) => {
+  return function(data: any[]): any[] {
+    const start = performance.now()
+    const result = original(data)
+    const duration = performance.now() - start
+    
+    console.log(`Processed ${data.length} items in ${duration.toFixed(2)}ms`)
+    
+    if (duration > 1000) {
+      console.warn("Processing took longer than 1 second!")
+    }
+    
+    return result
+  }
+})
+```
+
+### Method Replacement
+
+```typescript
+import { patch } from "@smithery/sdk"
+
+class Service {
+  getData(): string {
+    return "production data"
+  }
+}
+
+const service = new Service()
+
+// Replace method entirely (ignore original)
+patch(service, "getData", () => {
+  return function(): string {
+    return "mock data for testing"
+  }
+})
+
+console.log(service.getData()) // "mock data for testing"
+```
+
+### Optional Method Patching
+
+```typescript
+import { patch } from "@smithery/sdk"
+
+interface Config {
+  onInit?: () => void
+  onDestroy?: () => void
+}
+
+const config: Config = {
+  onInit: () => console.log("Initializing...")
+}
+
+// Patch optional method (may not exist)
+patch(config, "onInit", (original) => {
+  return function() {
+    console.log("Pre-init setup")
+    original?.() // Call original if it exists
+    console.log("Post-init cleanup")
+  }
+})
+
+// Safe to patch non-existent method
+patch(config, "onDestroy", (original) => {
+  return function() {
+    console.log("Destroying...")
+    original?.() // undefined, but safe
+  }
+})
+```
+
+## Real-World Usage in SDK
+
+The SDK uses `patch` internally for error handling in the AI SDK integration:
+
+```typescript
+// From /sdk/typescript/sdk/src/client/integrations/wrap-error.ts
+export function wrapError<C extends Pick<Client, "callTool">>(client: C): C {
+  patch(
+    client,
+    "callTool",
+    callTool => async (params, resultSchema, options?) => {
+      try {
+        return await callTool(params, resultSchema, options)
+      } catch (err) {
+        // Return error as content instead of throwing
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(err, Object.getOwnPropertyNames(err))
+          }],
+          isError: true
+        }
+      }
+    }
+  )
+  return client
+}
+```
+
+## Advanced Patterns
+
+### Middleware Chain
+
+```typescript
+function applyMiddleware<T>(
+  obj: T,
+  method: keyof T & string,
+  middlewares: Array<(next: Function) => Function>
+) {
+  middlewares.reverse().forEach(middleware => {
+    patch(obj, method, middleware)
+  })
+}
+
+// Usage
+const api = new APIClient()
+applyMiddleware(api, "request", [
+  withLogging,
+  withRetry,
+  withCache,
+  withAuth
+])
+```
+
+### Conditional Patching
+
+```typescript
+function patchInDevelopment<T>(
+  obj: T,
+  method: keyof T & string,
+  patcher: (fn: any) => any
+) {
+  if (process.env.NODE_ENV === "development") {
+    patch(obj, method, patcher)
+  }
+}
+
+// Only adds logging in development
+patchInDevelopment(service, "processData", withLogging)
+```
+
+### Reversible Patching
+
+```typescript
+class PatchManager<T> {
+  private originals = new Map<keyof T, Function>()
+  
+  patch(obj: T, key: keyof T & string, patcher: (fn: any) => any) {
+    if (!this.originals.has(key)) {
+      this.originals.set(key, obj[key])
+    }
+    patch(obj, key, patcher)
+  }
+  
+  restore(obj: T, key: keyof T & string) {
+    const original = this.originals.get(key)
+    if (original) {
+      obj[key] = original as any
+      this.originals.delete(key)
+    }
+  }
+}
+```
+
+## Best Practices
+
+1. **Preserve original behavior**: Unless replacing entirely, always call the original function
+2. **Handle missing methods**: Use optional chaining (`original?.()`) for optional methods
+3. **Maintain type safety**: Ensure patched function matches original signature
+4. **Document patches**: Clearly comment why and what you're patching
+5. **Avoid deep nesting**: Don't patch already-patched methods multiple times without care
+
+## Common Use Cases
+
+- **Logging**: Add debug output to methods
+- **Error handling**: Wrap methods with try-catch
+- **Performance monitoring**: Measure execution time
+- **Mocking**: Replace methods for testing
+- **Feature flags**: Conditionally modify behavior
+- **Rate limiting**: Add throttling to methods
+- **Caching**: Add memoization to expensive operations
+- **Validation**: Add input/output validation
+
+## TypeScript Considerations
+
+The function uses overloads to handle both required and optional properties:
+
+```typescript
+// This works (required method)
+const obj1 = { foo: () => "bar" }
+patch(obj1, "foo", fn => fn)
+
+// This also works (optional method)
+const obj2: { foo?: () => string } = {}
+patch(obj2, "foo", fn => fn || (() => "default"))
+
+// This gives a type error (property doesn't exist)
+const obj3 = {}
+patch(obj3, "foo", fn => fn) // Error: Property 'foo' doesn't exist
+```
+
+## Performance Notes
+
+- **Minimal overhead**: Single function replacement
+- **Preserves prototype chain**: Doesn't affect inheritance
+- **No memory leaks**: Original function is garbage collected if not referenced
+- **Synchronous operation**: No async overhead
+
+## Related
+
+- [wrapError](/sdk/integrations/wrap-error) - Error handling wrapper using patch
+- [AI SDK Integration](/sdk/integrations/ai-sdk) - Uses patch for tool wrapping
+- [Server middleware](/sdk/server) - Similar concept for Express middleware
