@@ -1,0 +1,404 @@
+---
+title: "parseAndValidateConfig"
+description: "Parse and validate configuration with Zod schemas"
+---
+
+The `parseAndValidateConfig` function handles configuration parsing and validation for MCP servers, supporting both base64-encoded and dot-notation parameters.
+
+## Function Signature
+
+```typescript
+function parseAndValidateConfig<T = Record<string, unknown>>(
+  req: ExpressRequest,
+  schema?: z.ZodSchema<T>
+): Result<T, ValidationError>
+```
+
+## Parameters
+
+### `req`
+- **Type**: `ExpressRequest`
+- **Required**: Yes
+- **Description**: Express request object containing configuration in query parameters
+
+### `schema`
+- **Type**: `z.ZodSchema<T>`
+- **Required**: No
+- **Description**: Optional Zod schema for validation. If not provided, returns raw parsed config
+
+## Return Value
+
+Returns a `Result` type (using `okay-error` pattern):
+- **Success**: `{ ok: true, value: T }` - Parsed and validated configuration
+- **Error**: `{ ok: false, error: ValidationError }` - Detailed error information
+
+## Configuration Sources
+
+The function processes configuration from multiple sources in the request:
+
+### 1. Base64-Encoded Config
+
+Primary configuration method using `?config=` parameter:
+
+```typescript
+// URL: https://server/mcp?config=eyJhcGlLZXkiOiJzay0xMjMiLCJtb2RlbCI6ImdwdC00In0=
+// Decodes to: { apiKey: "sk-123", model: "gpt-4" }
+
+const result = parseAndValidateConfig(req, schema)
+if (result.ok) {
+  console.log(result.value) // { apiKey: "sk-123", model: "gpt-4" }
+}
+```
+
+### 2. Dot-Notation Parameters
+
+Additional parameters using dot notation:
+
+```typescript
+// URL: https://server/mcp?server.host=localhost&server.port=8080&debug=true
+// Parses to: { server: { host: "localhost", port: 8080 }, debug: true }
+
+const result = parseAndValidateConfig(req)
+if (result.ok) {
+  console.log(result.value)
+  // {
+  //   server: {
+  //     host: "localhost",
+  //     port: 8080
+  //   },
+  //   debug: true
+  // }
+}
+```
+
+### 3. Combined Sources
+
+Both methods can be used together, with dot-notation overriding base64 config:
+
+```typescript
+// URL: https://server/mcp?config=eyJwb3J0IjozMDAwfQ==&port=4000
+// Base64 decodes to: { port: 3000 }
+// Final result: { port: 4000 } (dot-notation wins)
+```
+
+## Usage Examples
+
+### Basic Usage
+
+```typescript
+import { parseAndValidateConfig } from "@smithery/sdk"
+import { z } from "zod"
+
+const configSchema = z.object({
+  apiKey: z.string(),
+  model: z.string().default("gpt-3.5-turbo"),
+  temperature: z.number().min(0).max(2).default(0.7)
+})
+
+app.post("/mcp", (req, res) => {
+  const result = parseAndValidateConfig(req, configSchema)
+  
+  if (!result.ok) {
+    return res.status(result.error.status).json(result.error)
+  }
+  
+  const config = result.value
+  // Use validated config
+  console.log(`Using model: ${config.model}`)
+})
+```
+
+### Without Schema (Raw Parsing)
+
+```typescript
+app.post("/mcp", (req, res) => {
+  const result = parseAndValidateConfig(req)
+  
+  if (!result.ok) {
+    return res.status(400).json({
+      error: "Failed to parse configuration"
+    })
+  }
+  
+  const config = result.value
+  // Manually validate if needed
+})
+```
+
+### Complex Schema Validation
+
+```typescript
+const configSchema = z.object({
+  auth: z.object({
+    type: z.enum(["apiKey", "oauth"]),
+    credentials: z.string()
+  }),
+  features: z.object({
+    streaming: z.boolean().default(false),
+    caching: z.boolean().default(true)
+  }).optional(),
+  endpoints: z.array(z.string().url()).optional()
+})
+
+app.post("/mcp", (req, res) => {
+  const result = parseAndValidateConfig(req, configSchema)
+  
+  if (!result.ok) {
+    console.error("Validation errors:", result.error.errors)
+    return res.status(result.error.status).json(result.error)
+  }
+  
+  const config = result.value
+  // Fully typed and validated config
+})
+```
+
+## Error Handling
+
+### Validation Error Format
+
+When validation fails, the error object contains:
+
+```typescript
+interface ValidationError {
+  title: string
+  status: number
+  detail: string
+  instance: string
+  configSchema?: object  // JSON Schema of expected format
+  errors?: Array<{
+    param: string       // Parameter path (e.g., "auth.apiKey")
+    pointer: string     // JSON Pointer (e.g., "/auth/apiKey")
+    reason: string      // Human-readable error message
+    received: unknown   // Actual value received
+  }>
+}
+```
+
+### Error Response Example
+
+```json
+{
+  "title": "Invalid configuration parameters",
+  "status": 422,
+  "detail": "One or more config parameters are invalid.",
+  "instance": "/mcp?model=invalid",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "model": {
+        "type": "string",
+        "enum": ["gpt-3.5-turbo", "gpt-4"]
+      }
+    }
+  },
+  "errors": [
+    {
+      "param": "model",
+      "pointer": "/model",
+      "reason": "Invalid enum value. Expected 'gpt-3.5-turbo' | 'gpt-4'",
+      "received": "invalid"
+    }
+  ]
+}
+```
+
+### Handling Errors in Server
+
+```typescript
+import { createStatefulServer, parseAndValidateConfig } from "@smithery/sdk"
+
+function handleConfig(req: ExpressRequest) {
+  const result = parseAndValidateConfig(req, configSchema)
+  
+  if (!result.ok) {
+    // Log detailed error
+    console.error("Config validation failed:", {
+      title: result.error.title,
+      errors: result.error.errors
+    })
+    
+    // Return user-friendly error
+    throw new Error(result.error.detail)
+  }
+  
+  return result.value
+}
+```
+
+## Advanced Usage
+
+### Type Inference
+
+```typescript
+const configSchema = z.object({
+  apiKey: z.string(),
+  options: z.object({
+    timeout: z.number(),
+    retries: z.number()
+  })
+})
+
+// Infer the type
+type Config = z.infer<typeof configSchema>
+
+// Use in function
+function processConfig(req: ExpressRequest): Config {
+  const result = parseAndValidateConfig(req, configSchema)
+  if (!result.ok) {
+    throw new Error(result.error.detail)
+  }
+  return result.value // Fully typed as Config
+}
+```
+
+### Custom Error Handling
+
+```typescript
+app.post("/mcp", (req, res) => {
+  const result = parseAndValidateConfig(req, configSchema)
+  
+  if (!result.ok) {
+    // Custom error response
+    const error = result.error
+    
+    if (error.errors?.some(e => e.param === "apiKey")) {
+      return res.status(401).json({
+        error: "Invalid or missing API key"
+      })
+    }
+    
+    return res.status(error.status).json({
+      error: error.detail,
+      fields: error.errors?.map(e => ({
+        field: e.param,
+        message: e.reason
+      }))
+    })
+  }
+  
+  // Continue with validated config
+})
+```
+
+### Middleware Pattern
+
+```typescript
+function validateConfig(schema: z.ZodSchema) {
+  return (req: ExpressRequest, res: Response, next: NextFunction) => {
+    const result = parseAndValidateConfig(req, schema)
+    
+    if (!result.ok) {
+      return res.status(result.error.status).json(result.error)
+    }
+    
+    // Attach validated config to request
+    req.validatedConfig = result.value
+    next()
+  }
+}
+
+// Use as middleware
+app.post("/mcp", 
+  validateConfig(configSchema),
+  (req, res) => {
+    const config = req.validatedConfig
+    // Use validated config
+  }
+)
+```
+
+## URL Parameter Examples
+
+### Simple Parameters
+
+```
+?apiKey=sk-123&model=gpt-4&temperature=0.5
+```
+
+Parses to:
+```javascript
+{
+  apiKey: "sk-123",
+  model: "gpt-4",
+  temperature: 0.5
+}
+```
+
+### Nested Objects
+
+```
+?auth.type=oauth&auth.clientId=abc&auth.clientSecret=xyz
+```
+
+Parses to:
+```javascript
+{
+  auth: {
+    type: "oauth",
+    clientId: "abc",
+    clientSecret: "xyz"
+  }
+}
+```
+
+### Arrays (Multiple Values)
+
+```
+?tags=ai&tags=ml&tags=nlp
+```
+
+Parses to:
+```javascript
+{
+  tags: ["ai", "ml", "nlp"]
+}
+```
+
+### Type Coercion
+
+The function automatically parses JSON-compatible values:
+
+```
+?enabled=true&count=42&ratio=0.5&data={"key":"value"}
+```
+
+Parses to:
+```javascript
+{
+  enabled: true,      // Boolean
+  count: 42,          // Number
+  ratio: 0.5,         // Number
+  data: { key: "value" }  // Object
+}
+```
+
+## Related Functions
+
+### parseExpressRequestConfig
+
+Simpler function that only handles base64 config:
+
+```typescript
+function parseExpressRequestConfig(req: ExpressRequest): Record<string, unknown> {
+  return JSON.parse(
+    Buffer.from(req.query.config as string, 'base64').toString()
+  )
+}
+```
+
+Use when you only need base64 config without validation or dot-notation.
+
+## Best Practices
+
+1. **Always validate** - Use schemas to catch errors early
+2. **Provide clear errors** - Help users fix configuration issues
+3. **Use appropriate defaults** - Make optional fields truly optional
+4. **Document parameters** - Use schema descriptions
+5. **Handle missing config** - Gracefully handle when no config provided
+
+## Related
+
+- [Configuration schemas](/sdk/configuration/schemas) - Define validation schemas
+- [Configuration overview](/sdk/configuration) - Configuration patterns
+- [Server configuration](/sdk/server/stateful) - Using in servers

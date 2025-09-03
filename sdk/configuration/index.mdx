@@ -1,0 +1,321 @@
+---
+title: "Configuration"
+description: "Validate and manage configuration in Smithery MCP servers"
+---
+
+The Smithery SDK provides powerful configuration management with Zod schema validation, URL parameter parsing, and type safety.
+
+## Overview
+
+Configuration in Smithery servers can come from:
+1. **URL parameters** - Query string or base64-encoded config
+2. **Profiles** - Saved configurations in Smithery
+3. **Environment variables** - Server-side settings
+4. **Default values** - Schema-defined defaults
+
+## Key Components
+
+<CardGroup>
+  <Card
+    title="Schemas"
+    icon="shield-check"
+    href="/sdk/configuration/schemas"
+  >
+    Define configuration with Zod schemas
+  </Card>
+  <Card
+    title="Validation"
+    icon="check-circle"
+    href="/sdk/configuration/validation"
+  >
+    Parse and validate configurations
+  </Card>
+</CardGroup>
+
+## Basic Configuration
+
+### Define a Schema
+
+```typescript
+import { z } from "zod"
+
+export const configSchema = z.object({
+  // Required fields
+  apiKey: z.string().describe("API key for external service"),
+  
+  // Optional with defaults
+  model: z.enum(["gpt-3.5", "gpt-4"]).default("gpt-3.5"),
+  temperature: z.number().min(0).max(2).default(0.7),
+  
+  // Nested configuration
+  features: z.object({
+    streaming: z.boolean().default(false),
+    caching: z.boolean().default(true),
+    maxRetries: z.number().min(0).max(10).default(3)
+  }).optional(),
+  
+  // Arrays
+  allowedDomains: z.array(z.string()).default([]),
+  
+  // Custom validation
+  webhookUrl: z.string().url().optional().refine(
+    (url) => !url || url.startsWith("https://"),
+    "Webhook URL must use HTTPS"
+  )
+})
+
+// Infer TypeScript type
+type Config = z.infer<typeof configSchema>
+```
+
+### Use in Server
+
+```typescript
+import { createStatefulServer } from "@smithery/sdk"
+
+function createMcpServer({ sessionId, config }: {
+  sessionId: string
+  config: Config  // Type-safe config
+}) {
+  const server = new Server({
+    name: "configured-server",
+    version: "1.0.0"
+  })
+
+  // Use validated config
+  console.log(`Using model: ${config.model}`)
+  console.log(`API key: ${config.apiKey.substring(0, 8)}...`)
+
+  return server
+}
+
+// Server validates config on each request
+const app = createStatefulServer(createMcpServer, {
+  schema: configSchema
+})
+```
+
+## Configuration Sources
+
+### 1. Direct Configuration
+
+Users can pass configuration in the connection URL:
+
+```typescript
+// Client-side
+const transport = createTransport("server.smithery.ai", {
+  config: {
+    apiKey: "sk-1234567890",
+    model: "gpt-4",
+    temperature: 0.5
+  }
+})
+```
+
+### 2. URL Parameters
+
+Configuration via URL query parameters:
+
+```
+https://server.smithery.ai/mcp?api_key=sk-123&model=gpt-4&features.streaming=true
+```
+
+The SDK automatically:
+- Parses dot notation (`features.streaming` → `{ features: { streaming: true } }`)
+- Handles array values
+- Validates types
+
+### 3. Profile-Based
+
+Use saved configurations:
+
+```typescript
+// Client uses saved profile
+const transport = createTransport("server.smithery.ai", {
+  profile: "production"
+})
+```
+
+### 4. Environment Variables
+
+Server-side configuration:
+
+```typescript
+const serverConfig = z.object({
+  port: z.number().default(3000),
+  databaseUrl: z.string(),
+  redisUrl: z.string().optional()
+})
+
+// Parse from environment
+const config = serverConfig.parse({
+  port: parseInt(process.env.PORT || "3000"),
+  databaseUrl: process.env.DATABASE_URL,
+  redisUrl: process.env.REDIS_URL
+})
+```
+
+## Advanced Patterns
+
+### Dynamic Configuration
+
+```typescript
+// Schema that adapts based on environment
+const configSchema = z.object({
+  environment: z.enum(["development", "staging", "production"]),
+  apiEndpoint: z.string().url()
+}).transform((config) => {
+  // Add computed fields
+  return {
+    ...config,
+    debug: config.environment === "development",
+    timeout: config.environment === "production" ? 30000 : 5000
+  }
+})
+```
+
+### Configuration Composition
+
+```typescript
+// Base configuration
+const baseConfig = z.object({
+  apiKey: z.string(),
+  timeout: z.number().default(5000)
+})
+
+// Extended for specific features
+const aiConfig = baseConfig.extend({
+  model: z.string(),
+  temperature: z.number()
+})
+
+const databaseConfig = baseConfig.extend({
+  connectionString: z.string(),
+  poolSize: z.number().default(10)
+})
+
+// Combine configurations
+const fullConfig = z.intersection(aiConfig, databaseConfig)
+```
+
+### Secure Configuration
+
+```typescript
+// Separate public and private config
+const publicSchema = z.object({
+  model: z.string(),
+  maxTokens: z.number()
+})
+
+const privateSchema = z.object({
+  apiKey: z.string(),
+  webhookSecret: z.string()
+})
+
+function createMcpServer({ config }) {
+  // Public config from client
+  const publicConfig = publicSchema.parse(config)
+  
+  // Private config from environment
+  const privateConfig = privateSchema.parse({
+    apiKey: process.env.API_KEY,
+    webhookSecret: process.env.WEBHOOK_SECRET
+  })
+  
+  // Merge for internal use
+  const fullConfig = { ...publicConfig, ...privateConfig }
+  
+  return server
+}
+```
+
+## Validation Examples
+
+### Custom Validators
+
+```typescript
+const configSchema = z.object({
+  email: z.string().email(),
+  
+  // Custom domain validation
+  domain: z.string().refine(
+    (val) => /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/.test(val),
+    "Invalid domain format"
+  ),
+  
+  // Conditional validation
+  notificationEmail: z.string().email().optional(),
+  enableNotifications: z.boolean()
+}).refine(
+  (data) => !data.enableNotifications || data.notificationEmail,
+  "Notification email required when notifications are enabled"
+)
+```
+
+### Transformation
+
+```typescript
+const configSchema = z.object({
+  // Parse comma-separated values
+  tags: z.string().transform((val) => val.split(',').map(s => s.trim())),
+  
+  // Parse JSON string
+  metadata: z.string().transform((val) => JSON.parse(val)),
+  
+  // Normalize URLs
+  apiUrl: z.string().transform((val) => 
+    val.endsWith('/') ? val.slice(0, -1) : val
+  )
+})
+```
+
+## Error Handling
+
+When configuration validation fails:
+
+```json
+{
+  "title": "Invalid configuration parameters",
+  "status": 422,
+  "detail": "One or more config parameters are invalid.",
+  "instance": "/mcp?model=invalid",
+  "configSchema": { /* JSON Schema */ },
+  "errors": [
+    {
+      "param": "model",
+      "pointer": "/model",
+      "reason": "Invalid enum value",
+      "received": "invalid"
+    }
+  ]
+}
+```
+
+Handle in client:
+
+```typescript
+try {
+  await client.connect(transport)
+} catch (error) {
+  if (error.status === 422) {
+    console.error("Configuration errors:")
+    error.errors.forEach(err => {
+      console.error(`- ${err.param}: ${err.reason}`)
+    })
+  }
+}
+```
+
+## Best Practices
+
+1. **Use descriptions**: Help users understand each field
+2. **Provide defaults**: Make configuration easier
+3. **Validate early**: Catch errors at connection time
+4. **Secure secrets**: Never expose sensitive data in schemas
+5. **Version schemas**: Handle configuration migration
+
+## Related
+
+- [Schema definition](/sdk/configuration/schemas) - Detailed schema guide
+- [Validation functions](/sdk/configuration/validation) - Parsing and validation
+- [Server setup](/sdk/server) - Using configuration in servers
