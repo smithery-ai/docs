@@ -1,0 +1,377 @@
+---
+title: "Stateless Servers"
+description: "Build simple MCP servers without session management"
+---
+
+Stateless servers are the simplest way to build MCP servers. Each request creates a new server instance with no persistence between calls.
+
+## When to Use Stateless Servers
+
+Choose stateless servers when:
+- Tools don't need to remember previous interactions
+- You want minimal memory usage
+- Horizontal scaling is important
+- Server logic is purely functional
+
+## Basic Implementation
+
+While the SDK doesn't include a dedicated `createStatelessServer` function, you can easily create one:
+
+```typescript
+import express from "express"
+import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js"
+
+function createStatelessServer(createMcpServer: (config: any) => Server) {
+  const app = express()
+  
+  app.post("/mcp", async (req, res) => {
+    // Parse config from request
+    const config = req.query.config 
+      ? JSON.parse(Buffer.from(req.query.config as string, 'base64').toString())
+      : {}
+    
+    // Create new server instance for this request
+    const server = createMcpServer({ config })
+    
+    // Create transport
+    const transport = new StreamableHTTPServerTransport()
+    await server.connect(transport)
+    
+    // Handle the request
+    transport.handleRequest(req, res)
+  })
+  
+  return app
+}
+```
+
+## Usage Examples
+
+### Simple Tool Server
+
+```typescript
+function createMcpServer({ config }) {
+  const server = new Server({
+    name: "calculator",
+    version: "1.0.0"
+  }, {
+    capabilities: {
+      tools: {}
+    }
+  })
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      {
+        name: "calculate",
+        description: "Perform mathematical calculations",
+        inputSchema: {
+          type: "object",
+          properties: {
+            expression: { 
+              type: "string",
+              description: "Math expression to evaluate"
+            }
+          },
+          required: ["expression"]
+        }
+      }
+    ]
+  }))
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "calculate") {
+      const result = evaluateExpression(request.params.arguments.expression)
+      return {
+        content: [{
+          type: "text",
+          text: `Result: ${result}`
+        }]
+      }
+    }
+  })
+
+  return server
+}
+
+const app = createStatelessServer(createMcpServer)
+app.listen(3000)
+```
+
+### API Wrapper Server
+
+```typescript
+import { z } from "zod"
+import axios from "axios"
+
+const configSchema = z.object({
+  apiKey: z.string().describe("API key for weather service"),
+  units: z.enum(["metric", "imperial"]).default("metric")
+})
+
+function createMcpServer({ config }) {
+  const validatedConfig = configSchema.parse(config)
+  
+  const server = new Server({
+    name: "weather-api",
+    version: "1.0.0"
+  })
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "get_weather") {
+      const { city } = request.params.arguments
+      
+      const response = await axios.get("https://api.weather.com/v1/current", {
+        params: {
+          q: city,
+          units: validatedConfig.units,
+          appid: validatedConfig.apiKey
+        }
+      })
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(response.data, null, 2)
+        }]
+      }
+    }
+  })
+
+  return server
+}
+```
+
+### Database Query Server
+
+```typescript
+function createMcpServer({ config }) {
+  const server = new Server({
+    name: "database-query",
+    version: "1.0.0"
+  })
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "query") {
+      // Create new connection for each request
+      const db = await createConnection(config.connectionString)
+      
+      try {
+        const results = await db.query(request.params.arguments.sql)
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(results.rows, null, 2)
+          }]
+        }
+      } finally {
+        // Always close connection
+        await db.close()
+      }
+    }
+  })
+
+  return server
+}
+```
+
+## Comparison with Stateful Servers
+
+| Aspect | Stateless | Stateful |
+|--------|-----------|----------|
+| Memory usage | Low - new instance per request | Higher - instances persist |
+| Complexity | Simple - no state management | Complex - session handling |
+| Scaling | Easy - any instance can handle any request | Harder - needs session affinity |
+| Use cases | APIs, calculations, lookups | Chat, workflows, authentication |
+
+## Best Practices
+
+### 1. Keep It Functional
+
+```typescript
+// Good: Pure function
+function createMcpServer({ config }) {
+  const server = new Server(/* ... */)
+  
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    // Process input, return output
+    const result = processData(request.params.arguments)
+    return formatResponse(result)
+  })
+  
+  return server
+}
+
+// Avoid: Side effects outside request handling
+let globalCounter = 0  // This won't work as expected!
+```
+
+### 2. Resource Management
+
+```typescript
+function createMcpServer({ config }) {
+  const server = new Server(/* ... */)
+  
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    // Create resources per request
+    const connection = await createConnection()
+    
+    try {
+      return await processWithConnection(connection, request)
+    } finally {
+      // Always cleanup
+      await connection.close()
+    }
+  })
+  
+  return server
+}
+```
+
+### 3. Configuration Validation
+
+```typescript
+import { z } from "zod"
+
+const configSchema = z.object({
+  endpoint: z.string().url(),
+  timeout: z.number().positive().default(5000),
+  retries: z.number().min(0).max(5).default(3)
+})
+
+function createMcpServer({ config }) {
+  // Validate on each request
+  const validated = configSchema.parse(config)
+  
+  const server = new Server(/* ... */)
+  // Use validated config...
+  
+  return server
+}
+```
+
+### 4. Error Handling
+
+```typescript
+function createMcpServer({ config }) {
+  const server = new Server(/* ... */)
+  
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    try {
+      return await handleTool(request)
+    } catch (error) {
+      // Log error details
+      console.error(`Error in ${request.params.name}:`, error)
+      
+      // Return user-friendly error
+      throw new McpError(
+        ErrorCode.InternalError,
+        "Tool execution failed. Please try again."
+      )
+    }
+  })
+  
+  return server
+}
+```
+
+## Performance Considerations
+
+### Connection Pooling
+
+For stateless servers that need database or API connections:
+
+```typescript
+// Create a connection pool outside the server factory
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20
+})
+
+function createMcpServer({ config }) {
+  const server = new Server(/* ... */)
+  
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    // Get connection from pool
+    const client = await pool.connect()
+    
+    try {
+      const result = await client.query(request.params.arguments.query)
+      return formatResponse(result)
+    } finally {
+      // Return to pool
+      client.release()
+    }
+  })
+  
+  return server
+}
+```
+
+### Caching
+
+Implement request-level caching:
+
+```typescript
+function createMcpServer({ config }) {
+  const server = new Server(/* ... */)
+  const cache = new Map()
+  
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const cacheKey = JSON.stringify(request.params)
+    
+    // Check cache
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey)
+    }
+    
+    // Compute result
+    const result = await computeExpensiveOperation(request.params)
+    
+    // Cache for this request only
+    cache.set(cacheKey, result)
+    
+    return result
+  })
+  
+  return server
+}
+```
+
+## Deployment
+
+Stateless servers are ideal for:
+
+1. **Serverless functions** (AWS Lambda, Vercel Functions)
+2. **Container orchestration** (Kubernetes, ECS)
+3. **Load-balanced environments**
+4. **Auto-scaling deployments**
+
+Example Dockerfile:
+
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+EXPOSE 3000
+CMD ["node", "server.js"]
+```
+
+## When to Upgrade to Stateful
+
+Consider switching to stateful servers when you need:
+
+- User authentication that persists
+- Multi-step workflows
+- Conversation history
+- Progressive data collection
+- Session-specific caching
+
+## Related
+
+- [Stateful servers](/sdk/server/stateful) - For session persistence
+- [Server patterns](/sdk/server) - Overview of server types
+- [Configuration](/sdk/configuration) - Config validation patterns
