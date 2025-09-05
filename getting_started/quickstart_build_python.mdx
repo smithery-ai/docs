@@ -25,6 +25,7 @@ uvx smithery init
 
 This sets up a Python MCP server scaffold with example code and all necessary dependencies.
 
+
 ### 2. Edit the Server
 
 In `src/hello_server/server.py`, you'll see a default server that says hello to a given name. Edit it to add your own tools, resources, and prompts.
@@ -32,24 +33,18 @@ In `src/hello_server/server.py`, you'll see a default server that says hello to 
 Here's the basic structure:
 
 ```python
-from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from smithery import from_fastmcp # [!code highlight]
-from smithery.server.fastmcp_patch import SmitheryFastMCP # [!code highlight]
+from smithery import smithery # [!code highlight]
 
 # Optional: Configuration schema for session
 class ConfigSchema(BaseModel):
     access_token: str = Field(..., description="Your access token for authentication")
     capitalize: bool = Field(True, description="Whether to capitalize the greeting")
 
-def create_server(config: ConfigSchema) -> SmitheryFastMCP:
+@smithery(config_schema=ConfigSchema, name="Say Hello") # [!code highlight]
+def create_server(server, config: ConfigSchema): # [!code highlight]
     """Create and configure the MCP server."""
-    
-    server = from_fastmcp(
-        FastMCP(name="Say Hello"),
-        config_schema=ConfigSchema,
-    )
 
     # Add a tool
     @server.tool() # [!code highlight]
@@ -68,25 +63,41 @@ def create_server(config: ConfigSchema) -> SmitheryFastMCP:
     return server
 ```
 
-<Accordion title="Why patch FastMCP?">
-Smithery extends the standard FastMCP server with additional capabilities needed for streamable HTTP deployment:
-- CORS handling for web-based clients
-- Session-level configuration management
-- Compatibility with Smithery deployment infrastructure
+<Accordion title="How does the @smithery decorator work?">
+The `@smithery` decorator streamlines server creation by automatically:
+- Creating a FastMCP server instance with your specified name
+- Adding CORS handling for web-based clients
+- Setting up session-level configuration management
+- Applying Smithery deployment patches
 
-The `from_fastmcp()` function wraps your FastMCP server with these enhancements while keeping the familiar FastMCP API.
+You simply configure your tools, resources, and prompts on the provided `server` parameter, and the decorator handles all the deployment infrastructure automatically.
+</Accordion>
+
+<Accordion title="How does Smithery find your server?">
+The scaffold creates a `pyproject.toml` file with this configuration:
+
+```toml
+[tool.smithery]
+server = "hello_server.server:create_server"
+```
+
+This tells Smithery exactly where to find your server function using Python's import syntax: `module.path:function_name`. The `@smithery` decorator then provides all the configuration metadata (config schema, server name, etc.).
 </Accordion>
 
 <Tip>
 **Adding config schema (optional)**
 
-Smithery allows users to customize server behavior for each session by providing API keys, adjusting settings, or modifying operational parameters. Define a `ConfigSchema` using Pydantic to specify what configuration your server accepts:
+Smithery allows users to customize server behavior for each session by providing API keys, adjusting settings, or modifying operational parameters. Define a `ConfigSchema` using Pydantic and pass it to the `@smithery` decorator:
 
 ```python
 class ConfigSchema(BaseModel):
     api_key: str = Field(..., description="Weather API key")
     temperature_unit: str = Field("celsius", description="Temperature unit preference")
     debug: bool = Field(False, description="Enable debug logging")
+
+@smithery(config_schema=ConfigSchema, name="Weather Server")
+def create_server(server, config: ConfigSchema):
+    # Your server configuration here
 ```
 </Tip>
 
