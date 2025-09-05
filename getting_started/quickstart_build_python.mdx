@@ -4,7 +4,7 @@ icon: "hammer"
 description: "Deploy your first Python Streamable HTTP MCP server in minutes"
 ---
 
-![uvx smithery init](../images/quickstart-python.png)
+![uvx smithery init](../images/py-playground.png)
 
 In this quickstart, we'll build a simple MCP server that says hello to users. We'll use the official Python MCP SDK with the Smithery CLI. By the end, you'll have a live, deployed server with built-in authentication that you can connect to from any MCP client.
 
@@ -34,6 +34,7 @@ Here's the basic structure:
 
 ```python
 from pydantic import BaseModel, Field
+from mcp.server.fastmcp import FastMCP
 
 from smithery.decorators import smithery # [!code highlight]
 
@@ -42,17 +43,17 @@ class ConfigSchema(BaseModel):
     access_token: str = Field(..., description="Your access token for authentication")
     capitalize: bool = Field(True, description="Whether to capitalize the greeting")
 
-@smithery(config_schema=ConfigSchema, name="Say Hello") # [!code highlight]
-def create_server(server, config: ConfigSchema): # [!code highlight]
+@smithery(config_schema=ConfigSchema) # [!code highlight]
+def create_server(config: ConfigSchema): # [!code highlight]
     """Create and configure the MCP server."""
+    
+    # Create your FastMCP server as usual # [!code highlight]
+    server = FastMCP("Say Hello") # [!code highlight]
 
     # Add a tool
     @server.tool() # [!code highlight]
     def hello(name: str) -> str: # [!code highlight]
         """Say hello to someone.""" # [!code highlight]
-        ctx = server.get_context() # [!code highlight]
-        config = ctx.session_config # [!code highlight]
-        
         greeting = f"Hello, {name}!" # [!code highlight]
         return greeting.upper() if config.capitalize else greeting.lower() # [!code highlight]
 
@@ -60,17 +61,26 @@ def create_server(server, config: ConfigSchema): # [!code highlight]
     # @server.resource("example://resource")
     # @server.prompt()
 
-    return server
+    return server # [!code highlight]
 ```
 
 <Accordion title="How does the @smithery decorator work?">
-The `@smithery` decorator streamlines server creation by automatically:
-- Creating a FastMCP server instance with your specified name
-- Adding CORS handling for web-based clients
-- Setting up session-level configuration management
-- Applying Smithery deployment patches
+The `@smithery` decorator enhances any FastMCP server with deployment features:
 
-You simply configure your tools, resources, and prompts on the provided `server` parameter, and the decorator handles all the deployment infrastructure automatically.
+```python
+# You create FastMCP as usual
+server = FastMCP("My Server")
+@server.tool()
+def my_tool() -> str:
+    return "Hello!"
+
+# Smithery adds:
+# - Session-scoped configuration management  
+# - CORS headers for web client compatibility
+# - Runtime patches for deployment environment
+```
+
+You write normal FastMCP code, and Smithery automatically enhances it for production deployment.
 </Accordion>
 
 <Accordion title="How does Smithery find your server?">
@@ -103,17 +113,21 @@ def create_server(server, config: ConfigSchema):
 
 ### 3. Testing the Server
 
+For local development:
+
 ```bash
 uv run dev
 ```
 
-This will port-forward your local server to the Smithery Playground via ngrok. You can now test your server by prompting something like "Say hello to Henry".
+This launches your server locally for development and testing.
 
-For interactive testing, you can also use:
+For testing in the Smithery Playground:
 
 ```bash
 uv run playground
 ```
+
+This will port-forward your local server to the Smithery Playground via ngrok. You can now test your server by prompting something like "Say hello to Henry".
 
 ### 4. Deploy the Server
 
