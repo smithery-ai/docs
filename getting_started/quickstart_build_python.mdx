@@ -4,6 +4,10 @@ icon: "code"
 description: "Deploy your first Python Streamable HTTP MCP server in minutes"
 ---
 
+<Note>
+This Python quickstart is currently in beta. Run into any issues? Reach us at our [Discord](https://discord.gg/Afd38S5p9A).
+</Note>
+
 ![uvx smithery init](../images/py-playground.png)
 
 In this quickstart, we'll build a simple MCP server that says hello to users. We'll use the official Python MCP SDK with the Smithery CLI. By the end, you'll have a live, deployed server with built-in authentication that you can connect to from any MCP client.
@@ -69,44 +73,23 @@ def create_server(): # [!code highlight]
     return server # [!code highlight]
 ```
 
-<Accordion title="More about Session Configuration">
-Add a config schema to let users customize your server per session:
+<Tip>
+**Adding config schema (optional)**
+
+Smithery allows users to customize server behavior for each session by providing API keys, adjusting settings, or modifying operational parameters. Optionally define a `ConfigSchema` using Pydantic to specify what configuration your server accepts:
 
 ```python
 class ConfigSchema(BaseModel):
     api_key: str = Field(..., description="Weather API key")
-    unit: str = Field("celsius", description="Temperature unit (celsius/fahrenheit)")
+    unit: str = Field("celsius", description="Temperature unit preference")
 
-@smithery.server(config_schema=ConfigSchema) # [!code highlight]
+@smithery.server(config_schema=ConfigSchema)
 def create_server():
-    server = FastMCP("Weather Server")
-    
-    @server.tool()
-    def get_weather(city: str, ctx: Context) -> str:
-        config = ctx.session_config
-        # Use config.api_key for API requests:
-        # requests.get(f"https://api.weather.com/weather/{city}", 
-        #              headers={"Authorization": f"Bearer {config.api_key}"})
-        return f"Weather for {city} in {config.unit}"
-    
-    return server
+    # Access config via ctx.session_config in your tools
 ```
 
-**No config needed?** Just omit the `config_schema` parameter:
-
-```python
-@smithery.server()  # No config schema
-def create_server():
-    server = FastMCP("Calculator")
-    
-    @server.tool()
-    def add_numbers(a: int, b: int) -> int:
-        """Add two numbers together."""
-        return a + b
-    
-    return server
-```
-</Accordion>
+**No config needed?** Just omit the `config_schema` parameter: `@smithery.server()`
+</Tip>
 
 ### 3. Testing the Server
 
