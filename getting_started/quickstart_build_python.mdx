@@ -56,7 +56,7 @@ def create_server(): # [!code highlight]
         # Access session-specific config through context
         session_config = ctx.session_config
         
-        # Create greeting based on pirate mode # [!code highlight]
+        # Create greeting based on pirate mode
         if session_config.pirate_mode: # [!code highlight]
             return f"Ahoy, {name}!" # [!code highlight]
         else: # [!code highlight]
@@ -69,9 +69,7 @@ def create_server(): # [!code highlight]
     return server # [!code highlight]
 ```
 
-<Tip>
-**Session configuration (optional)**
-
+<Accordion title="More about Session Configuration">
 Add a config schema to let users customize your server per session:
 
 ```python
@@ -79,7 +77,7 @@ class ConfigSchema(BaseModel):
     api_key: str = Field(..., description="Weather API key")
     unit: str = Field("celsius", description="Temperature unit (celsius/fahrenheit)")
 
-@smithery.server(config_schema=ConfigSchema)
+@smithery.server(config_schema=ConfigSchema) # [!code highlight]
 def create_server():
     server = FastMCP("Weather Server")
     
@@ -108,7 +106,7 @@ def create_server():
     
     return server
 ```
-</Tip>
+</Accordion>
 
 ### 3. Testing the Server
 
