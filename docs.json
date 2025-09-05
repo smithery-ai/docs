@@ -17,7 +17,6 @@
 				"group": "Getting Started",
 				"pages": [
 					"index",
-					"getting_started/quickstart_connect",
 					"getting_started/quickstart_build_typescript",
 					"getting_started/quickstart_build_python"
 				]
