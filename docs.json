@@ -18,7 +18,8 @@
 				"pages": [
 					"index",
 					"getting_started/quickstart_build_typescript",
-					"getting_started/quickstart_build_python"
+					"getting_started/quickstart_build_python",
+					"getting_started/quickstart_connect"
 				]
 			},
 			{
@@ -39,8 +40,7 @@
 			{
 				"group": "Cookbooks",
 				"pages": [
-					"cookbooks/typescript_oauth_client",
-					"cookbooks/python_custom_container"
+					"cookbooks/typescript_oauth_client"
 				]
 			},
 			{
