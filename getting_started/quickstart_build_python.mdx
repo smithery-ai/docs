@@ -1,0 +1,115 @@
+---
+title: "Quickstart: Build Python MCP server"
+icon: "hammer"
+description: "Build and deploy your first Python Streamable HTTP MCP server in 10 minutes"
+---
+
+![uvx smithery init](../images/quickstart-python.png)
+
+In this quickstart, we'll build a simple MCP server that says hello to users. We'll use the official Python MCP SDK with the Smithery CLI. By the end, you'll have a live, deployed server with built-in authentication that you can connect to from any MCP client.
+
+For TypeScript, check out our [TypeScript quickstart guide](/getting_started/quickstart_build_typescript).
+
+### Prerequisites
+
+- [Python](https://python.org/) >=3.10
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python package manager)
+- A [Smithery API key](https://smithery.ai) for development features
+
+### 1. Initialize the Server
+
+```bash
+uvx smithery init
+```
+
+This sets up a Python MCP server scaffold with example code and all necessary dependencies.
+
+### 2. Edit the Server
+
+In `src/hello_server/server.py`, you'll see a default server that says hello to a given name. Edit it to add your own tools, resources, and prompts.
+
+Here's the basic structure:
+
+```python
+from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel, Field
+
+from smithery import from_fastmcp # [!code highlight]
+from smithery.server.fastmcp_patch import SmitheryFastMCP # [!code highlight]
+
+# Optional: Configuration schema for session
+class ConfigSchema(BaseModel):
+    access_token: str = Field(..., description="Your access token for authentication")
+    capitalize: bool = Field(True, description="Whether to capitalize the greeting")
+
+def create_server(config: ConfigSchema) -> SmitheryFastMCP:
+    """Create and configure the MCP server."""
+    
+    server = from_fastmcp(
+        FastMCP(name="Say Hello"),
+        config_schema=ConfigSchema,
+    )
+
+    # Add a tool
+    @server.tool() # [!code highlight]
+    def hello(name: str) -> str: # [!code highlight]
+        """Say hello to someone.""" # [!code highlight]
+        ctx = server.get_context() # [!code highlight]
+        config = ctx.session_config # [!code highlight]
+        
+        greeting = f"Hello, {name}!" # [!code highlight]
+        return greeting.upper() if config.capitalize else greeting.lower() # [!code highlight]
+
+    # The scaffold also includes example resources and prompts
+    # @server.resource("example://resource")
+    # @server.prompt()
+
+    return server
+```
+
+<Accordion title="Why patch FastMCP?">
+Smithery extends the standard FastMCP server with additional capabilities needed for streamable HTTP deployment:
+- CORS handling for web-based clients
+- Session-level configuration management
+- Compatibility with Smithery deployment infrastructure
+
+The `from_fastmcp()` function wraps your FastMCP server with these enhancements while keeping the familiar FastMCP API.
+</Accordion>
+
+<Tip>
+**Adding config schema (optional)**
+
+Smithery allows users to customize server behavior for each session by providing API keys, adjusting settings, or modifying operational parameters. Define a `ConfigSchema` using Pydantic to specify what configuration your server accepts:
+
+```python
+class ConfigSchema(BaseModel):
+    api_key: str = Field(..., description="Weather API key")
+    temperature_unit: str = Field("celsius", description="Temperature unit preference")
+    debug: bool = Field(False, description="Enable debug logging")
+```
+</Tip>
+
+### 3. Testing the Server
+
+```bash
+uv run dev
+```
+
+This will port-forward your local server to the Smithery Playground via ngrok. You can now test your server by prompting something like "Say hello to Henry".
+
+For interactive testing, you can also use:
+
+```bash
+uv run playground
+```
+
+### 4. Deploy the Server
+
+<img
+  src="../images/deploy-2.png"
+  alt="Deployment"
+/>
+
+Deployment is a one-click process. Just [make a GitHub repo](https://github.com/new) and [click "Deploy" on the Smithery home page](https://smithery.ai/new).
+
+
