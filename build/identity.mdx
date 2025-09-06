@@ -5,33 +5,37 @@ description: Authenticate Smithery users in your MCP server
 
 ## Overview
 
-Smithery Identity allows your MCP server to identify end users without requiring them to create separate accounts or manage API keys. When users connect to your server through Smithery, we pass a cryptographically-signed identity token that you can verify and use to provision or link users in your existing auth system.
+Smithery Identity allows your MCP server to identify end users without requiring them to create separate accounts or manage API keys. When users connect to your server through Smithery, we use OAuth 2.0 Token Exchange (RFC 8693) to seamlessly obtain access tokens for your server on behalf of the user. This skips an extra OAuth screen and enables your MCP server to be used purely server-side.
 
 ### Key benefits
 - **Zero-friction onboarding**: Users don't need to sign up separately for your service. This can boost traffic by 30%!
-- **Works with existing auth**: Seamlessly integrates with Clerk, Supabase Auth, Better Auth, NextAuth, and others
+- **Works with existing auth**: Seamlessly integrates with OAuth 2.0 providers
+- **Spec-compliant**: Uses standard OAuth 2.0 Token Exchange
 
 ### How it works
 
-When a request comes through Smithery's gateway to your MCP server:
-1. Smithery adds a `smithery-identity` header with a signed JWT
-2. Your server verifies the token and extracts the user's unique identifier
-3. You provision or link the user in your auth system using this identifier
+When a user calls your MCP server through Smithery:
 
-## Quick start
+1. Smithery detects your server requires authentication (401 response)
+2. Smithery performs OAuth 2.0 Token Exchange with your authorization server
+3. Your server receives a standard `Authorization: Bearer <token>` header
+4. You validate the token and identify/provision the user
 
-### Using the TypeScript SDK (Recommended)
+This approach is fully compliant with the MCP specification and OAuth 2.0 standards.
 
-When using the Smithery TypeScript SDK (see [TypeScript deployment guide](/build/deployments/typescript)), the identity is automatically verified and passed to your `createServer` function:
+## Quick start with Smithery TypeScript SDK
+
+When using the Smithery TypeScript SDK (see [TypeScript deployment guide](/build/deployments/typescript)), user authentication is handled automatically:
 
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 export default function createServer({ config, user }) {
-  // user contains the verified identity:
-  // - user.sub: unique user ID for your server
+  // user contains the authenticated user information:
+  // - user.id: unique identifier from your auth system
   // - user.email: email address (if available)
   // - user.name: display name (if available)
+  // - Additional claims from your OAuth provider
   
   const server = new McpServer({
     name: "Your Server",
@@ -41,8 +45,8 @@ export default function createServer({ config, user }) {
   server.addTool({
     name: "get_user_data",
     handler: async () => {
-      // Use the user.sub as a unique identifier
-      const data = await fetchUserData(user.sub);
+      // User is already authenticated
+      const data = await fetchUserData(user.id);
       return { data };
     }
   });
@@ -51,257 +55,210 @@ export default function createServer({ config, user }) {
 }
 ```
 
-**No verification needed**: The SDK handles all token verification automatically. The `user` parameter is only present when a valid identity token was provided.
+**That's it!** The Smithery SDK handles:
+- OAuth 2.0 token exchange negotiation
+- Token validation
+- User provisioning
+- Passing the authenticated user to your server
 
-### Manual Authentication
+## Manual integration
 
-If you're not using our TypeScript SDK, you'll need to manually verify the token:
+If you're not using the Smithery TypeScript SDK, you'll need to implement OAuth 2.0 Token Exchange support in your authorization server.
 
-<Tabs>
-  <Tab title="Node.js">
-```javascript
+### 1. Enable Token Exchange on your OAuth server
+
+Add a token exchange endpoint that accepts Smithery ID tokens:
+
+```typescript
+// Add token exchange support to your OAuth server
+app.post('/oauth/token', async (req, res) => {
+  const { grant_type, subject_token, subject_token_type } = req.body;
+  
+  if (grant_type === 'urn:ietf:params:oauth:grant-type:token-exchange') {
+    // Verify the incoming Smithery OIDC ID token
+    const smitheryToken = await verifySmitheryIdToken(subject_token);
+    
+    if (!smitheryToken) {
+      return res.status(400).json({ error: 'invalid_request' });
+    }
+    
+    // Create or lookup user based on Smithery identity
+    const user = await findOrCreateUser({
+      externalId: `smithery:${smitheryToken.sub}`,
+      email: smitheryToken.email
+    });
+    
+    // Issue access token for your MCP server
+    const accessToken = await issueAccessToken(user);
+    
+    return res.json({
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expires_in: 3600
+    });
+  }
+  
+  // Handle other grant types...
+});
+```
+
+### 2. Verify Smithery ID tokens
+
+Smithery sends a standard OIDC ID token that must be validated according to OpenID Connect Core specification:
+
+```typescript
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
-const JWKS = createRemoteJWKSet(new URL('https://smithery.ai/.well-known/jwks.json'));
-const ISSUER = 'https://smithery.ai';
-const AUDIENCE = '@your-org/your-server'; // Your server's qualified name
+const SMITHERY_JWKS = createRemoteJWKSet(
+  new URL('https://smithery.ai/.well-known/jwks.json')
+);
 
-export async function verifySmitheryIdentity(req) {
-  const header = req.headers['smithery-identity'];
-  if (!header) return null;
-  
-  const token = header.replace(/^Bearer\s+/i, '');
-  
+async function verifySmitheryIdToken(token: string) {
   try {
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: ISSUER,
-      audience: AUDIENCE,
-      clockTolerance: 90 // Allow 90s clock skew
+    // Validate according to OIDC Core spec:
+    // - Signature verification using RS256
+    // - Public key from well-known JWKS
+    // - Valid iss, aud, exp, nbf claims
+    const { payload } = await jwtVerify(token, SMITHERY_JWKS, {
+      issuer: 'https://smithery.ai',
+      audience: '@your-org/your-server', // Your server's qualified name
+      algorithms: ['RS256']
     });
     
     return payload;
+    // Standard OIDC claims:
+    // - iss: "https://smithery.ai"
+    // - sub: pairwise user identifier
+    // - aud: your server's qualified name
+    // - exp: expiration time
+    // - nbf: not before time
+    // - iat: issued at time
+    // Optional claims:
+    // - email: user's email
+    // - name: user's name
   } catch (error) {
-    console.error('Token verification failed:', error);
+    console.error('Invalid Smithery token:', error);
     return null;
   }
 }
 ```
-  </Tab>
-  
-  <Tab title="Python">
-```python
-import jwt
-from jwt import PyJWKClient
 
-JWKS_CLIENT = PyJWKClient('https://smithery.ai/.well-known/jwks.json')
-ISSUER = 'https://smithery.ai'
-AUDIENCE = '@your-org/your-server'  # Your server's qualified name
+### 3. Configure OAuth metadata
 
-def verify_smithery_identity(request):
-    header = request.headers.get('smithery-identity')
-    if not header:
-        return None
-    
-    token = header.replace('Bearer ', '')
-    
-    try:
-        signing_key = JWKS_CLIENT.get_signing_key_from_jwt(token)
-        payload = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=['ES256', 'EdDSA'],
-            issuer=ISSUER,
-            audience=AUDIENCE,
-            options={'verify_exp': True, 'verify_nbf': True}
-        )
-        return payload
-    except Exception as e:
-        print(f'Token verification failed: {e}')
-        return None
-```
+Your server needs to advertise token exchange support:
 
-</Tab>
-</Tabs>
+```json
+// .well-known/oauth-protected-resource
+{
+  "resource": "https://your-server.example.com",
+  "authorization_servers": ["https://auth.example.com"]
+}
 
-## Token format
-
-The `smithery-identity` header contains a JWT with the following structure:
-
-### Header format
-```http
-smithery-identity: Bearer <JWT>
-```
-
-### Token claims
-
-| Claim | Type | Description | Always present |
-|-------|------|-------------|----------------|
-| `iss` | string | Token issuer (`https://smithery.ai`) | ✓ |
-| `aud` | string | Your server's qualified name (e.g., `@smithery/weather`) | ✓ |
-| `sub` | string | Pairwise user identifier unique to your server | ✓ |
-| `iat` | number | Issued at timestamp | ✓ |
-| `nbf` | number | Not valid before timestamp | ✓ |
-| `exp` | number | Expiration timestamp (typically 60s from issuance) | ✓ |
-| `jti` | string | Unique token ID for replay protection | ✓ |
-| `email` | string | User's email (if consented) | |
-| `name` | string | User's display name (if consented) | |
-| `org` | object | Organization context `{ id, role }` | |
-| `scope` | string | Requested permissions | |
-
-### Privacy and pairwise identifiers
-
-The `sub` claim is a **pairwise identifier** - it's unique to your server and cannot be correlated across different MCP servers. This protects user privacy while still giving you a stable identifier for each user.
-
-**Example**: If user Alice connects to both your weather MCP and someone else's news MCP, she'll have completely different `sub` values for each server. The weather MCP might see `sub: "abc123"` while the news MCP sees `sub: "xyz789"` - there's no way to know it's the same user.
-
-## Auto-provisioning users
-
-When you receive a Smithery identity token, you'll typically want to automatically create or link a user account in your existing auth system. Here's how to do this with popular auth providers:
-
-### Clerk
-
-```typescript
-import { clerkClient } from '@clerk/nextjs/server';
-
-async function provisionClerkUser(smitherySub: string, email?: string) {
-  const externalId = `smithery:${smitherySub}`;
-  
-  // Try to find existing user
-  const users = await clerkClient.users.getUserList({
-    externalId: [externalId]
-  });
-  
-  if (users.length > 0) {
-    return users[0].id;
-  }
-  
-  // Create new user
-  const user = await clerkClient.users.createUser({
-    externalId,
-    emailAddress: email ? [email] : undefined,
-    skipPasswordRequirement: true
-  });
-  
-  return user.id;
+// auth.example.com/.well-known/oauth-authorization-server
+{
+  "issuer": "https://auth.example.com",
+  "token_endpoint": "https://auth.example.com/oauth/token",
+  "grant_types_supported": [
+    "authorization_code",
+    "urn:ietf:params:oauth:grant-type:token-exchange"
+  ],
+  "token_endpoint_auth_methods_supported": ["none"],
+  "subject_token_types_supported": [
+    "urn:ietf:params:oauth:token-type:id_token"
+  ]
 }
 ```
 
-### Supabase Auth
+### 4. Handle authenticated MCP requests
+
+Your MCP server receives standard OAuth Bearer tokens:
 
 ```typescript
-import { createClient } from '@supabase/supabase-js';
+// Validate the access token from Authorization header
+const token = req.headers.authorization?.replace('Bearer ', '');
+const user = await validateAccessToken(token);
 
-const supabase = createClient(url, serviceRoleKey);
-
-async function provisionSupabaseUser(smitherySub: string, email?: string) {
-  const externalId = `smithery:${smitherySub}`;
-  
-  // Check if user exists
-  const { data: users } = await supabase.auth.admin.listUsers();
-  const existingUser = users?.users.find(
-    u => u.user_metadata?.externalId === externalId
-  );
-  
-  if (existingUser) {
-    return existingUser.id;
-  }
-  
-  // Create new user
-  const { data: { user } } = await supabase.auth.admin.createUser({
-    email: email
-    email_confirm: true,
-    user_metadata: { externalId }
-  });
-  
-  return user?.id;
-}
+// Process MCP request with authenticated user context
 ```
 
-### Better Auth / NextAuth
+## Token Exchange flow
 
-```typescript
-// Using Better Auth
-import { betterAuth } from 'better-auth';
+```mermaid
+sequenceDiagram
+    participant S as Smithery
+    participant E as Your MCP Server
+    participant A as Auth Server
 
-async function provisionBetterAuthUser(smitherySub: string, email?: string) {
-  const externalId = `smithery:${smitherySub}`;
-  
-  // Check existing
-  const existingUser = await db.user.findFirst({
-    where: { externalId }
-  });
-  
-  if (existingUser) {
-    return existingUser.id;
-  }
-  
-  // Create new user
-  const user = await db.user.create({
-    data: {
-      externalId,
-      email: email,
-      emailVerified: email ? new Date() : null
-    }
-  });
-  
-  return user.id;
-}
+    Note over S,E: Discover and obtain token for your MCP server
+    S->>E: MCP call without token
+    E-->>S: 401 with WWW-Authenticate
+    S->>E: GET /.well-known/oauth-protected-resource
+    E-->>S: Protected Resource Metadata
+    S->>A: GET /.well-known/oauth-authorization-server
+    A-->>S: Authorization Server Metadata
+    alt Token exchange supported
+        S->>A: POST /token RFC 8693<br/>subject_token: Smithery ID token
+        A-->>S: Access token for your MCP server
+    else Fallback
+        S-->>A: Standard OAuth 2.1 flow if needed
+    end
+    S->>E: MCP call<br/>Authorization: Bearer token
+    E-->>S: Response
 ```
 
-## Error handling
+## Security considerations
 
-When token verification fails, return a proper 401 response with a Bearer challenge:
+### ID Token validation
+The Smithery ID token is a standard OIDC ID token that must be validated according to OpenID Connect Core specification:
+- **Algorithm**: RS256 signature verification
+- **Keys**: Public keys available via JWKS at `https://smithery.ai/.well-known/jwks.json`
+- **Required claims**: `iss`, `aud`, `exp`, `nbf`, `sub`
+- **Issuer**: Must be `https://smithery.ai`
+- **Audience**: Must match your server's qualified name
 
-```typescript
-// On verification failure
-return new Response('Unauthorized', {
-  status: 401,
-  headers: {
-    'WWW-Authenticate': 'Bearer realm="smithery", error="invalid_token", error_description="Token verification failed"'
-  }
-});
-```
+### Privacy
+- The `sub` claim is pairwise - unique to your server
+- Users cannot be tracked across different MCP servers
+- Only request PII (email, name) if necessary
 
-### Common verification errors
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `expired` | Token has expired | Gateway will retry with fresh token |
-| `invalid_audience` | Token not for your server | Check your server ID configuration |
-| `invalid_signature` | Token signature invalid | Ensure using correct JWKS URL |
-| `clock_skew` | System clock mismatch | Allow 90s clock tolerance |
-
-## Security best practices
-
-### Do's
-- ✅ Verify every request's token
-- ✅ Use the provided JWKS URL for signature verification
-- ✅ Check both `iss` and `aud` claims match expected values
-- ✅ Handle token expiration gracefully (short TTL ~60s)
-- ✅ Store only the `externalId` mapping, not the full token
-
-### Don'ts
-- ❌ Don't log full tokens (redact to first/last 4 chars if needed)
-- ❌ Don't accept expired tokens
-- ❌ Don't skip audience validation
-- ❌ Don't cache tokens beyond their expiration
+### Trust relationship
+- By accepting Smithery ID tokens, you trust Smithery's user authentication
+- Consider implementing additional verification for sensitive operations
 
 ## FAQ
 
-### Do I need my own auth system?
+### Do I need my own OAuth server?
 
-Not necessarily! You can use the `sub` claim directly as your user identifier without provisioning into another auth system. This works well for AI-native applications where users primarily interact through agents.
+If using the Smithery TypeScript SDK, no - it's handled for you. For manual integration, yes - you need an OAuth 2.0 authorization server that supports token exchange.
 
-### How do I handle token refresh?
+### What about servers that don't need authentication?
 
-You don't need to - tokens are short-lived (60s) and the Smithery gateway automatically provides fresh tokens with each request.
+Anonymous servers don't need any of this - Smithery will call them directly without authentication.
 
-### What about existing users who already have accounts?
+### How do I handle existing users?
 
-You can provide an account linking flow where existing users can associate their account with their Smithery identity. Store the mapping and future requests will resolve to the existing account.
+You can provide an account linking flow where existing users associate their account with their Smithery identity during the first token exchange.
+
+### What's the performance impact?
+
+Token exchange happens once per user session. Smithery caches the resulting access token according to your server's token lifetime.
 
 ## Reference
 
+### Smithery ID Token
+- **Type**: OIDC ID Token (`urn:ietf:params:oauth:token-type:id_token`)
+- **Algorithm**: RS256
 - **Issuer**: `https://smithery.ai`
 - **Audience**: Your server's qualified name (e.g., `@smithery/weather-server`)
 - **JWKS URL**: `https://smithery.ai/.well-known/jwks.json`
+
+### Token Exchange
+- **Grant Type**: `urn:ietf:params:oauth:grant-type:token-exchange`
+- **Subject Token Type**: `urn:ietf:params:oauth:token-type:id_token`
+
+## Learn more
+
+- [RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)
+- [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
+- [MCP Authorization Specification](https://modelcontextprotocol.io/docs/spec/authentication)
+- [OAuth 2.0 Protected Resource Metadata](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-resource-metadata)
