@@ -60,6 +60,7 @@
 						"pages": [
 							"build/deployments/index",
 							"build/deployments/typescript",
+							"build/deployments/python",
 							"build/deployments/custom-container"
 						]
 					},
