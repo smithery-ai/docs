@@ -1,23 +1,60 @@
 ---
-title: "Build MCPs"
-description: "Learn how to build and host your Model Context Protocol (MCP) servers on Smithery."
+title: "Overview"
+description: "Learn how to build and deploy your Model Context Protocol (MCP) servers on Smithery."
+icon: 'hammer'
 ---
 
 ## Introduction
 
-Smithery supports developers building MCPs with [CI/CD deployments, hosting](/build/deployments), and observability tools. When you host on Smithery, you get:
+Smithery Deployments allow you to distribute your MCP server to users, hosted and served over [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) connection. When you host on Smithery, you get:
 
 - **Discovery** - A dedicated page with an interactive playground where users can discover and try your MCP server online
 - **Zero Setup** - Users can connect from any MCP client without installing dependencies or security concerns
 - **Better Visibility** - Hosted servers rank higher in our search results and registry
 
-## Getting Started
+> If you're self-hosting and only need listing and distribution on Smithery, you can publish an external MCP by URL. See [External MCPs](/build/external).
 
-Choose your development approach from our cookbooks:
+## Deployment Patterns
 
-- <Icon icon="rocket" size={16} /> **[Quick Start (Recommended)](/getting_started/quickstart_build)** - Uses the official MCP TypeScript SDK with Smithery CLI for building your server
-- <Icon icon="container" size={16} /> **[Docker Container (Advanced)](/cookbooks/python_custom_container)** - Build MCP servers using Docker containers in any language.
+Smithery supports two main deployment patterns to accommodate different development needs:
 
-> If you already host your MCP elsewhere and just want distribution and observability on Smithery, see [External MCPs (self-hosted)](/build/external).
+### Native CLI Support (Recommended)
+
+We provide native support for the most popular MCP development frameworks through our CLI, handling containerization and deployment automatically:
+
+<CardGroup cols={2}>
+  <Card
+    title="TypeScript with Smithery CLI"
+    icon="braces"
+    href="/build/deployments/typescript"
+  >
+    Integrates directly with the official MCP TypeScript SDK.
+  </Card>
+  <Card
+    title="Python with Smithery CLI"
+    icon="python"
+    href="/build/deployments/python"
+  >
+    Works with the official MCP SDK's FastMCP (both v1 and v2).
+  </Card>
+</CardGroup>
+
+This is the **recommended approach** for most developers as it requires minimal configuration and follows best practices out of the box.
+
+### Custom Container (Advanced)
+
+For advanced use cases or other languages:
+
+<Card
+  title="Custom Docker Container"
+  icon="docker"
+  href="/build/deployments/custom-container"
+>
+  Full control over your deployment environment. Requires additional setup to ensure compatibility with Smithery's hosting infrastructure.
+</Card>
+
+Choose this pattern when you need custom runtime environments, specific system dependencies, or are using languages other than TypeScript/Python.
+
+**Have an existing STDIO server?** Check our [migration guides](/migrations/stdio-to-http) to convert it for Smithery deployment.
 
 

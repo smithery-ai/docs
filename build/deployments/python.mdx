@@ -1,6 +1,7 @@
 ---
 title: 'Python Servers'
 description: 'Deploy Python MCP servers on Smithery'
+icon: 'python'
 ---
 
 ## Overview
@@ -77,23 +78,56 @@ server = "my_server.server:create_server" # [!code highlight]
 Your Python MCP server must have a function decorated with `@smithery.server()` that returns a FastMCP server object.
 
 ```python
-# src/my_server/server.py
-from mcp.server.fastmcp import FastMCP
+# src/weather_server/server.py
+from mcp.server.fastmcp import Context, FastMCP
 from smithery.decorators import smithery
+from pydantic import BaseModel, Field
 
-@smithery.server() # [!code highlight]
-def create_server():
-    """Create and return a FastMCP server instance."""
+class ConfigSchema(BaseModel):
+    unit: str = Field("celsius", description="Temperature unit (celsius or fahrenheit)")
+
+@smithery.server(config_schema=ConfigSchema) # [!code highlight]
+def create_server(): # [!code highlight]
+    """Create and return a FastMCP server instance with session config."""
     
-    server = FastMCP(name="My Server")
+    server = FastMCP(name="Weather Server")
 
     @server.tool()
-    def my_tool(text: str) -> str:
-        """Example tool that processes text."""
-        return f"Processed: {text}"
+    def get_weather(city: str, ctx: Context) -> str: # [!code highlight]
+        """Get weather for a city."""
+        # Access session-specific config through context
+        session_config = ctx.session_config # [!code highlight]
+        
+        # Use the configured temperature unit
+        unit = session_config.unit
+        formatted_temp = f"22°C" if unit == "celsius" else "72°F"
+
+        return f"Weather in {city}: {formatted_temp}"
 
     return server
 ```
+
+<Tip>
+**Accessing Session Configuration**
+
+Session-specific configuration is accessed through the `Context` parameter in your tools:
+
+```python
+@server.tool()
+def my_tool(arg: str, ctx: Context) -> str:
+    # Access user's session config
+    config = ctx.session_config
+    
+    # Use config values to customize behavior
+    if config.api_key:
+        # Make authenticated API calls
+        pass
+```
+
+Each user session gets its own configuration instance, enabling per-user customization of your server's behavior.
+
+**No config needed?** Just omit the `config_schema` parameter: `@smithery.server()`
+</Tip>
 
 **Key Requirements:**
 - Function must be decorated with `@smithery.server()`
