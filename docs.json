@@ -74,6 +74,7 @@
 			},
 			{
 				"group": "Cookbooks",
+				"icon": "chef-hat",
 				"pages": [
 					"cookbooks/typescript_oauth_client"
 				]

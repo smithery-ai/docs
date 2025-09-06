@@ -4,56 +4,175 @@ description: 'Allow clients to connect to MCP servers with a specific configurat
 icon: 'settings-2'
 ---
 
-Session configurations let you give your users flexibility in how your MCP server behaves for their specific connection. Each user can customize their session differently, and configurations provide a secure way for them to pass secrets (e.g., API keys) to your server.
+## Overview
 
-## How Configurations Work
+Let's say you're building a weather server. You might want users to customize their preferred temperature unit (Celsius vs Fahrenheit), provide an API key for external weather services, or set their default location. Session configurations let you define these customizable parameters - each user connection gets its own configuration that doesn't affect other sessions, perfect for passing secrets and personalizing behavior.
 
-Every MCP server can define what configuration parameters it accepts. These parameters might include API keys, model settings, temperature values, or any other options that affect how the server responds to requests.
+<Note>
+  Configuration is passed to your server through a `?config` query parameter as base64-encoded JSON. Users can easily customize these settings through the Smithery interface when connecting to your server.
+</Note>
 
-<Info>
-  Configurations are bound to individual sessions. Each client connection has its own configuration that doesn't affect other sessions.
-</Info>
+## Defining Configuration
 
-## Define Your Configuration Schema
+How you define your configuration schema depends on your [deployment method](/build/deployments):
 
-Define what configuration your MCP server needs using JSON Schema in your [`smithery.yaml`](/build/project-config/smithery-yaml) file:
+1. **Smithery CLI** (TypeScript & Python): Schema automatically extracted from Zod/Pydantic schemas in your code.
+
+2. **Custom Container** (Any language): Manual schema definition in `smithery.yaml` file.
+
+Both approaches are explained in detail below.
+
+---
+
+### Smithery CLI Approach
+
+**For TypeScript and Python servers using Smithery's managed deployment**
+
+With Smithery CLI, configuration schemas are automatically extracted from your code - no need to manually define them in `smithery.yaml`.
+
+#### TypeScript with Zod
+
+Export a `configSchema` from your server entry point:
+
+```typescript
+// src/index.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+
+// Configuration schema - automatically detected by Smithery
+export const configSchema = z.object({ // [!code highlight]
+  apiKey: z.string().describe("Your API key"), // [!code highlight]
+  modelName: z.string().default("gpt-4").describe("Model to use"), // [!code highlight]
+  temperature: z.number().min(0).max(1).default(0.7).describe("Temperature setting"), // [!code highlight]
+}); // [!code highlight]
+
+export default function createServer({ 
+  config 
+}: { 
+  config: z.infer<typeof configSchema> 
+}) {
+  const server = new McpServer({
+    name: "My Server",
+    version: "1.0.0",
+  });
+
+  // Use config values in your tools
+  console.log(`Using model: ${config.modelName}`);
+  
+  return server.server;
+}
+```
+
+#### Python with Pydantic
+
+Use the `@smithery.server()` decorator with a Pydantic config schema:
+
+```python
+# src/my_server/server.py
+from mcp.server.fastmcp import FastMCP, Context
+from smithery.decorators import smithery
+from pydantic import BaseModel, Field
+
+class ConfigSchema(BaseModel): # [!code highlight]
+    api_key: str = Field(description="Your API key") # [!code highlight]
+    model_name: str = Field(default="gpt-4", description="Model to use") # [!code highlight]
+    temperature: float = Field(default=0.7, ge=0, le=1, description="Temperature setting") # [!code highlight]
+
+@smithery.server(config_schema=ConfigSchema) # [!code highlight]
+def create_server():
+    server = FastMCP(name="My Server")
+
+    @server.tool()
+    def my_tool(query: str, ctx: Context) -> str:
+        # Access session config through context
+        config = ctx.session_config
+        print(f"Using model: {config.model_name}")
+        return f"Response using {config.model_name}"
+
+    return server
+```
+
+**Key Points:**
+- Configuration schema is automatically extracted from your Zod/Pydantic definitions
+- No manual `smithery.yaml` configuration needed
+- Schema validation and UI generation handled automatically
+
+---
+
+### Custom Container Approach
+
+**For any programming language using Docker containers**
+
+With custom containers, you manually define configuration schemas in your `smithery.yaml` file.
 
 ```yaml smithery.yaml
+runtime: "container"
 startCommand:
-    type: http
-    configSchema:
-      type: object
-      required: ["openaiApiKey"]
-      properties:
-        openaiApiKey:
-          type: string
-          title: "OpenAI API Key"
-          description: "Your OpenAI API key"
-        modelName:
-          type: string
-          title: "Model Name"
-          default: "gpt-4"
-          enum: ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
-        temperature:
-          type: number
-          title: "Temperature"
-          description: "Controls randomness of output"
-          default: 0.7
-          minimum: 0
-          maximum: 1
+  type: http
+  configSchema:
+    type: object
+    required: ["apiKey"]
+    properties:
+      apiKey:
+        type: string
+        title: "Weather API Key"
+        description: "API key for weather service"
+      units:
+        type: string
+        title: "Temperature Units"
+        description: "Temperature unit preference"
+        default: "celsius"
+      maxResults:
+        type: integer
+        title: "Max Results"
+        description: "Maximum number of forecast days"
+        default: 5
+        minimum: 1
+        maximum: 14
 ```
 
 The `configSchema` supports all standard JSON Schema features:
 - Data types (`string`, `number`, `boolean`, etc.)
 - Required fields
 - Default values
-- Enumerated options
 - Min/max constraints
 - Descriptive titles and documentation
 
 The schema is used to both validate configurations and generate user interfaces in the Smithery web app.
 
-## How Your Server Receives Configuration
+**Key Points:**
+- Manual schema definition required in `smithery.yaml`
+- Must use `runtime: "container"` deployment mode
+- Full control over Docker environment and dependencies
+
+---
+
+## Using Configuration in Your Server
+
+Once you've defined your configuration schema, here's how to access and use those values in your server code.
+
+
+#### Smithery CLI: Automatic Injection
+
+**TypeScript**: Configuration is automatically injected into your `createServer` function:
+
+```typescript
+export default function createServer({ config }: { config: z.infer<typeof configSchema> }) {
+  // config is already parsed and validated
+  console.log(config.apiKey); // Direct access to config values
+}
+```
+
+**Python**: Configuration is available through the `Context` in your tools:
+
+```python
+@server.tool()
+def my_tool(query: str, ctx: Context) -> str:
+    config = ctx.session_config  # Already parsed Pydantic model
+    api_key = config.api_key     # Type-safe access
+```
+
+#### Custom Container: Manual Parsing
 
 **Your MCP server receives configuration as a base64-encoded JSON object** in the `config` query parameter:
 
@@ -61,30 +180,9 @@ The schema is used to both validate configurations and generate user interfaces 
 GET/POST /mcp?config=eyJzZXJ2ZXIiOnsiaG9zdCI6ImxvY2FsaG9zdCIsInBvcnQiOjgwODB9LCJkZWJ1ZyI6dHJ1ZX0=
 ```
 
-To parse this configuration in your server:
+To parse this configuration in your custom container server:
 
-<CodeGroup>
-
-```typescript TypeScript
-// Parse configuration from query parameters
-function parseConfig(req: Request) {
-  const url = new URL(req.url);
-  const configParam = url.searchParams.get('config');
-  if (configParam) {
-    return JSON.parse(Buffer.from(configParam, 'base64').toString());
-  }
-  return {};
-}
-
-// Usage in your MCP tool
-const config = parseConfig(request);
-const dbUrl = config.connectionString;
-const maxResults = config.maxResults || 10;
-
-// Each session connects to their own database
-```
-
-```python Python
+```python
 import json
 import base64
 from urllib.parse import parse_qs, urlparse
@@ -103,141 +201,90 @@ def parse_config(request_url: str) -> dict:
 
 # Usage
 config = parse_config(request.url)
-print(config)  # {'server': {'host': 'localhost', 'port': 8080}, 'debug': True}
+print(config)  # {'apiKey': 'your-key', 'units': 'celsius', 'maxResults': 5}
 ```
 
-</CodeGroup>
-
-### Using Configuration in Your Server
-
-Once you've parsed the configuration, you can use these values throughout your MCP server:
-
-<CodeGroup>
-
-```typescript TypeScript
-// Example: Using config in an MCP tool
-server.registerTool("query_database", {
-  description: "Query the database with user's connection",
-  inputSchema: {
-    query: { type: "string", description: "SQL query to execute" }
-  }
-}, async ({ query }, { request }) => {
-  const config = parseConfig(request);
-  
-  // Use configuration values
-  const dbUrl = config.connectionString;
-  const maxResults = config.maxResults || 10;
-  const apiKey = config.openaiApiKey;
-  
-  // Connect to user's specific database
-  const connection = await connectToDatabase(dbUrl);
-  const results = await connection.query(query, { limit: maxResults });
-  
-  return {
-    content: [{ type: "text", text: JSON.stringify(results) }]
-  };
-});
-```
-
-```python Python
-@mcp.tool()
-def query_database(query: str) -> str:
-    """Query the database with user's connection"""
-    # Access the parsed config (stored globally or passed to tool)
-    db_url = current_config.get('connectionString')
-    max_results = current_config.get('maxResults', 10)
-    api_key = current_config.get('openaiApiKey')
-    
-    # Use configuration values in your tool logic
-    connection = connect_to_database(db_url)
-    results = connection.query(query, limit=max_results)
-    
-    return json.dumps(results)
-```
-
-</CodeGroup>
 
 
 
-## Examples
 
-### Minimal Configuration
+## Best Practices
 
-If your server doesn't need any configuration, you can use an empty schema:
+<Accordion title="Schema Design">
+- **Provide clear documentation** - Use descriptive field names and descriptions for all parameters
+- **Set sensible defaults** - Users should be able to connect with minimal configuration
+- **Keep configurations focused** - Focus on essential parameters that affect server behavior
+- **Avoid large data** - Don't pass large binary data through configuration
+</Accordion>
 
-```yaml smithery.yaml
-  startCommand:
-    type: http
-    configSchema: {}
-```
+<Accordion title="Security & Validation">
+- **Handle secrets securely** - Never log or expose sensitive configuration values
+- **Validate server-side** - Always validate input in your server code, even though Smithery validates too
+- **Handle parsing errors gracefully** - Invalid configuration shouldn't crash your server
+- **Use proper constraints** - Set min/max values, required fields, and data types appropriately
+</Accordion>
 
-### Database Connection Configuration
+<Accordion title="Approach-Specific Tips">
+**Smithery CLI:**
+- Use descriptive Zod/Pydantic field descriptions (these become UI help text)
+- Leverage schema validation features (`.min()`, `.max()`, `.email()` etc.)
+- Make frequently-used settings optional with defaults
 
-A database connector might require connection details:
-
-```yaml smithery.yaml
-  startCommand:
-    type: http
-    configSchema:
-      type: object
-      required: ["connectionString"]
-      properties:
-        connectionString:
-          type: string
-          title: "Connection String"
-          description: "Database connection string"
-        maxConnections:
-          type: integer
-          default: 5
-          minimum: 1
-          maximum: 20
-        debug:
-          type: boolean
-          default: false
-```
-
-## Best Practices for MCP Authors
-
-1. **Provide clear documentation**
-   - Use `description` fields in your schema
-   - Document any non-obvious parameters
-
-2. **Set sensible defaults**
-   - Users should be able to connect with minimal configuration
-   - Use the `default` property for optional parameters
-
-3. **Use enums for limited choices**
-   - When there are specific valid options, list them in an `enum`
-   - This creates a dropdown in the UI instead of a free text field
-
-4. **Handle configuration securely**
-   - Pass secrets as environment variables
-   - Never log or expose configuration values
-   - Validate input server-side even though Smithery performs validation
-
-5. **Keep configurations small**
-   - Focus on essential parameters
-   - Large binary data should not be passed via configuration
+**Custom Container:**
+- Follow JSON Schema standards for proper type definitions
+- Test your schema to ensure it generates the expected UI
+- Handle base64 decoding and JSON parsing errors gracefully
+</Accordion>
 
 ## Troubleshooting
 
-### What happens if my configuration is invalid?
+<Accordion title="Smithery CLI Issues">
+**Configuration not detected?**
+- Ensure you're exporting `configSchema` from the same file as your `createServer` function (TypeScript)
+- Verify the `@smithery.server(config_schema=YourSchema)` decorator is used (Python)
+- Check that your schema is a valid Zod object or Pydantic BaseModel
 
+**Type errors in TypeScript?**
+- Make sure your `createServer` function accepts `{ config }` parameter
+- Use `z.infer<typeof configSchema>` for the config type
+
+**Python context issues?**
+- Ensure you're using `ctx: Context` parameter in your tool functions
+- Access config via `ctx.session_config`, not directly
+</Accordion>
+
+<Accordion title="Custom Container Issues">
+**Configuration not parsing?**
+- Check that your server correctly decodes base64 and parses JSON
+- Verify the `config` query parameter is being read properly
+- Test with a simple configuration first
+
+**Schema not generating UI?**
+- Ensure your `smithery.yaml` has valid JSON Schema syntax
+- Test your schema with an online JSON Schema validator
+- Check that required fields are properly specified
+</Accordion>
+
+<Accordion title="Common Questions">
+**Invalid configuration provided?**
 If a configuration doesn't match the schema, Smithery will reject the connection attempt and provide an error message explaining what's wrong.
 
-### Can I change configuration mid-session?
-
+**Can I change configuration mid-session?**
 No, configurations are bound to a session at connection time and cannot be changed during the session. To use a different configuration, establish a new connection.
 
-### Can configurations be optional?
+**Can configurations be optional?**
+Yes, in both approaches:
+- **Smithery CLI**: Use optional Zod/Pydantic fields with `.optional()` or default values
+- **Custom Container**: Don't include fields in the `required` array, provide `default` values
 
-Yes, by not including fields in the `required` array of your schema, those fields become optional. You can also provide default values using the `default` property.
-
-### Where can I find a server's configuration schema?
-
+**Where can I find a server's configuration schema?**
 You can view any MCP server's configuration schema in its API Tab on the server page. It provides a clean, syntax-highlighted code block of the raw JSON schema for easy reference and copying.
+</Accordion>
 
 ## See Also
 
-- [Project Configuration](/build/project-config) - How to define server configuration in `smithery.yaml`
+- [TypeScript Deployment](/build/deployments/typescript) - Deploy TypeScript servers with Smithery CLI
+- [Python Deployment](/build/deployments/python) - Deploy Python servers with Smithery CLI  
+- [Custom Container Deployment](/build/deployments/custom-container) - Deploy servers using Docker containers
+- [Project Configuration](/build/project-config) - Complete `smithery.yaml` reference
 - [JSON Schema Documentation](https://json-schema.org/understanding-json-schema/) - Learn more about JSON Schema
