@@ -1,15 +1,12 @@
 ---
-title: 'TypeScript with Smithery CLI'
+title: 'TypeScript Servers'
 description: 'Deploy TypeScript MCP servers on Smithery with automatic builds using Smithery CLI.'
+icon: 'braces'
 ---
 
-## When to Use This Approach
+## Overview
 
-Choose TypeScript with Smithery CLI when you:
-- Want the fastest deployment path for TypeScript/Node.js servers
-- Focus on MCP server logic and let Smithery handle containerization and infrastructure setup
-
-For more control over your environment or non-TypeScript languages, consider [Custom Docker Container](/build/deployments/custom-container) deployment.
+Deploy TypeScript MCP servers using the official MCP SDK with automatic containerization and infrastructure managed by Smithery.
 
 ## Prerequisites
 
@@ -37,13 +34,13 @@ my-mcp-server/
 
 ### 1. Configure smithery.yaml
 
-Create a `smithery.yaml` file in your repository root:
+Create a `smithery.yaml` file in your repository root (usually where the `package.json` is):
 
 ```yaml
 runtime: "typescript"
 ```
 
-That's it! This minimal configuration is intentional - Smithery handles containerization, HTTP transport, and deployment automatically for TypeScript projects.
+That's it! This minimal configuration is intentional - Smithery handles containerization, and deployment automatically for TypeScript projects.
 
 ### 2. Configure package.json
 
@@ -54,7 +51,7 @@ Your `package.json` must include the `module` field pointing to your server entr
   "name": "my-mcp-server",
   "version": "1.0.0",
   "type": "module",
-  "module": "src/index.ts",
+  "module": "src/index.ts",  // Points to your server entry point
   "scripts": {
     "build": "npx @smithery/cli build",
     "dev": "npx @smithery/cli dev"
@@ -167,12 +164,13 @@ Configuration applies to both `build` and `dev` commands.
 
 
 
-## What Happens Under the Hood
+## Good to Know
 
+<Accordion title="What happens under the hood">
 When you deploy, Smithery will:
 
 1. Clone your repository
-2. Parse your `smithery.yaml` to understand your TypeScript configuration
+2. Parse your `smithery.yaml` to detect TypeScript runtime
 3. Install dependencies with `npm ci`
 4. Build your TypeScript code using the `module` entry point from your `package.json` 
 5. Package your server into a containerized HTTP service
@@ -180,11 +178,11 @@ When you deploy, Smithery will:
 7. Send MCP `initialize` and `list_tools` messages with a dummy configuration to discover your server's capabilities
 8. Make it available at `https://server.smithery.ai/your-server/mcp`
 9. Handle load balancing, scaling, and monitoring
+</Accordion>
 
 ## Troubleshooting
 
-### Why does my deployment fail?
-
+<Accordion title="Why does my deployment fail?">
 Common deployment failures and solutions:
 
 - **Missing module field**: Ensure your `package.json` has the `module` field pointing to your entry point
@@ -195,3 +193,4 @@ Common deployment failures and solutions:
   npm run build
   ```
   If this fails, fix any TypeScript compilation errors or missing dependencies first
+</Accordion>

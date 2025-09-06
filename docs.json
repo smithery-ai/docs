@@ -23,6 +23,41 @@
 				]
 			},
 			{
+				"group": "Servers",
+				"pages": [
+					"build/index",
+					{
+						"group": "Deployments",
+						"icon": "rocket",
+						"pages": [
+							"build/deployments/typescript",
+							"build/deployments/python",
+							"build/deployments/custom-container"
+						]
+					},
+					"build/session-config",
+					{
+						"group": "Project Configuration",
+						"icon": "settings",
+						"pages": [
+							"build/project-config/index",
+							"build/project-config/dockerfile",
+							"build/project-config/smithery-yaml"
+						]
+					},
+					"build/permissions",
+					"build/external"
+				]
+			},
+			{
+				"group": "Clients",
+				"pages": [
+					"use/index",
+					"use/connect",
+					"use/deep-linking"
+				]
+			},
+			{
 				"group": "Concepts",
 				"pages": [
 					"concepts/what_is_mcp",
@@ -39,41 +74,9 @@
 			},
 			{
 				"group": "Cookbooks",
+				"icon": "chef-hat",
 				"pages": [
 					"cookbooks/typescript_oauth_client"
-				]
-			},
-			{
-				"group": "Use MCP Servers",
-				"pages": [
-					"use/index",
-					"use/connect",
-					"use/deep-linking"
-				]
-			},
-			{
-				"group": "Build MCP Servers",
-				"pages": [
-					"build/index",
-					{
-						"group": "Deployments",
-						"pages": [
-							"build/deployments/index",
-							"build/deployments/typescript",
-							"build/deployments/custom-container"
-						]
-					},
-					"build/session-config",
-					{
-						"group": "Project Configuration",
-						"pages": [
-							"build/project-config/index",
-							"build/project-config/dockerfile",
-							"build/project-config/smithery-yaml"
-						]
-					},
-					"build/permissions",
-					"build/external"
 				]
 			},
 			{
