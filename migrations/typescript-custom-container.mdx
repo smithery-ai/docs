@@ -104,31 +104,29 @@ app.use(express.json());
 **Skip this entire step if no configuration needed**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can skip this entire step. Your server will work perfectly fine without any configuration handling.
 </Info>
 
-If your server needs configuration (like API keys, user preferences, etc.), add these configuration handling functions:
+If your server needs configuration (like API keys, user preferences, etc.):
 
 ```typescript
 // src/index.ts (continued - only add if you need configuration)
+import type { Request, Response } from "express"
+import { z } from "zod"
+import { parseAndValidateConfig } from "@smithery/sdk"
 
 // Define session configuration schema
 export const configSchema = z.object({
   serverToken: z.string().optional().describe("Server access token"),
   caseSensitive: z.boolean().optional().default(false).describe("Whether character matching should be case sensitive"),
-});
+})
 
-// Parse configuration from query parameters
-function parseConfig(req: Request) {
-  const configParam = req.query.config as string;
-  if (configParam) {
-    return JSON.parse(Buffer.from(configParam, 'base64').toString());
+// Use SDK helper in your handler
+app.all('/mcp', (req: Request, res: Response) => {
+  const result = parseAndValidateConfig(req, configSchema)
+  if (result.error) {
+    return res.status(result.value.status).json(result.value)
   }
-  return {};
-}
-
-function validateServerAccess(serverToken?: string): boolean {
-  // Validate server token - accepts any string including empty ones for demo
-  // In a real app, you'd validate against your server's auth system
-  return serverToken !== undefined && serverToken.trim().length > 0 ? true : true;
-}
+  const config = result.value
+  // ... proceed with your server using `config`
+})
 ```
 
 ### Step 3: Create Server Function and Register Tools
@@ -193,16 +191,12 @@ Handle incoming MCP requests at the `/mcp` endpoint:
 // Handle MCP requests at /mcp endpoint
 app.all('/mcp', async (req: Request, res: Response) => {
   try {
-    // Parse configuration (only if you added configuration handling in Step 2)
-    const rawConfig = parseConfig ? parseConfig(req) : {};
-    
-    // Validate and parse configuration (only if you added configSchema in Step 2)
-    const config = configSchema ? configSchema.parse({
-      serverToken: rawConfig.serverToken || process.env.SERVER_TOKEN || undefined,
-      caseSensitive: rawConfig.caseSensitive || false,
-    }) : {};
-    
-    const server = createServer({ config });
+    const result = parseAndValidateConfig(req, configSchema)
+    if (result.error) {
+      return res.status(result.value.status).json(result.value)
+    }
+
+    const server = createServer({ config: result.value });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });

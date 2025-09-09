@@ -79,8 +79,8 @@ First, create the middleware that will extract config from URL parameters:
 ```python
 # middleware/__init__.py
 import json
-import base64
 from urllib.parse import parse_qs, unquote
+from smithery.utils.config import parse_config_from_asgi_scope
 
 class SmitheryConfigMiddleware:
     def __init__(self, app, config_callback):
@@ -89,21 +89,17 @@ class SmitheryConfigMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope.get('type') == 'http':
-            query = scope.get('query_string', b'').decode()
-            
-            if 'config=' in query:
-                try:
-                    config_b64 = unquote(parse_qs(query)['config'][0])
-                    config = json.loads(base64.b64decode(config_b64))
-                    self.config_callback(config)
-                    print(f"SmitheryConfigMiddleware: Extracted config: {list(config.keys())}")
-                except Exception as e:
-                    print(f"SmitheryConfigMiddleware: Error parsing config: {e}")
+            try:
+                config = parse_config_from_asgi_scope(scope)
+                self.config_callback(config)
+                print(f"SmitheryConfigMiddleware: Extracted config: {list(config.keys())}")
+            except Exception as e:
+                print(f"SmitheryConfigMiddleware: Error parsing config: {e}")
         await self.app(scope, receive, send)
 ```
 
 This middleware:
-- Extracts base64-encoded configuration from URL query parameters
+- Extracts configuration from JSON dot-notation query parameters
 - Decodes and parses the JSON configuration  
 - Calls your config callback function to handle the extracted config
 - Can be optionally extended to add additional logging functionality

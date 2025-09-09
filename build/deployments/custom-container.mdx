@@ -144,7 +144,7 @@ When you deploy, Smithery will:
 2. Parse your `smithery.yaml` to understand how to build and configure your server (Dockerfile path, build context, etc.)
 3. Build your Docker container using the specified Dockerfile
 4. Deploy the container to our hosting infrastructure
-5. Send MCP `initialize` and `list_tools` messages with a dummy configuration (via base64-encoded config parameter in URL) to discover your server's capabilities
+5. Send MCP `initialize` and `list_tools` messages with a dummy [configuration](/build/session-config) to discover your server's capabilities
 6. Make it available at `https://server.smithery.ai/your-server/mcp`
 7. Handle load balancing, scaling, and monitoring
 
@@ -166,14 +166,13 @@ If your server's capabilities aren't showing up in Smithery:
 - **CORS errors**: Configure CORS headers properly for the `/mcp` endpoint
 - **MCP protocol issues**: Ensure your server properly responds to `initialize` and `list_tools` messages
 - **Endpoint not found**: Verify your server exposes the `/mcp` endpoint correctly
-- **Configuration errors**: Check that your server handles the base64-encoded config parameter in the URL
 - **Server crashes**: Review your server logs for runtime errors during tool discovery
 
 ### How do I implement session configuration handling in my server?
 
 To handle user configuration (API keys, settings, etc.):
 
-- **Parse the config parameter**: Extract and decode the base64-encoded config from the URL query parameter
+- **Parse the config parameters**: Read and parse JSON dot-notation query parameters (e.g., `apiKey=...`, `model.name=...`)
 - **Validate configuration**: Check that required fields match your `configSchema` in `smithery.yaml`
 - **Handle missing config**: Gracefully handle cases where no configuration is provided
 - **See our [cookbook](/cookbooks/python_custom_container)** for a complete implementation example

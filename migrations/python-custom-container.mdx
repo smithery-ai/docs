@@ -101,11 +101,11 @@ mcp = FastMCP(name="Character Counter")
 **Skip this entire step if no configuration needed**: If your MCP server doesn't need any configuration (API keys, settings, etc.), you can skip this entire step including the middleware setup. Your server will work perfectly fine without any configuration handling.
 </Info>
 
-If your server needs configuration (like API keys, user preferences, etc.), you'll need both the configuration handling functions and the middleware to extract config from requests.
+If your server needs configuration (like API keys, user preferences, etc.), prefer using the Smithery Python SDK helpers rather than hand-rolled parsing.
 
-#### Step 2a: Add Configuration Functions
+#### Step 2a: Add Configuration Functions (SDK)
 
-Add these configuration handling functions to your main.py:
+Use these helpers and accessors with the SDK's parsing utilities:
 
 ```python
 # src/main.py (continued - only add if you need configuration)
@@ -145,15 +145,13 @@ def validate_server_access(server_token: Optional[str]) -> bool:
     return server_token is not None and len(server_token.strip()) > 0 if server_token else True
 ```
 
-#### Step 2b: Create Middleware Setup
+#### Step 2b: Create Middleware Setup (SDK)
 
-Create the middleware for handling Smithery configuration:
+Create middleware that uses `parse_config_from_asgi_scope` from the SDK:
 
 ```python
 # src/middleware.py
-import json
-import base64
-from urllib.parse import parse_qs, unquote
+from smithery.utils.config import parse_config_from_asgi_scope
 
 class SmitheryConfigMiddleware:
     def __init__(self, app):
@@ -161,27 +159,17 @@ class SmitheryConfigMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope.get('type') == 'http':
-            query = scope.get('query_string', b'').decode()
-            
-            if 'config=' in query:
-                try:
-                    config_b64 = unquote(parse_qs(query)['config'][0])
-                    config = json.loads(base64.b64decode(config_b64))
-                    
-                    # Inject full config into request scope for per-request access
-                    scope['smithery_config'] = config
-                except Exception as e:
-                    print(f"SmitheryConfigMiddleware: Error parsing config: {e}")
-                    scope['smithery_config'] = {}
-            else:
+            try:
+                scope['smithery_config'] = parse_config_from_asgi_scope(scope)
+            except Exception as e:
+                print(f"SmitheryConfigMiddleware: Error parsing config: {e}")
                 scope['smithery_config'] = {}
-        
         await self.app(scope, receive, send)
 ```
 
 This middleware:
-- Extracts base64-encoded configuration from URL query parameters
-- Decodes and parses the JSON configuration
+- Extracts configuration using the SDK's dot-notation parser
+- Parses values (numbers/booleans) from JSON where applicable
 - Stores the config in the request scope for per-request access
 - Provides error handling and logging for debugging
 
