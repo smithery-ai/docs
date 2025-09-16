@@ -12,29 +12,21 @@ Smithery Identity allows your MCP server to identify end users without requiring
 - **Works with existing auth**: Seamlessly integrates with OAuth 2.0 providers
 - **Spec-compliant**: Uses standard OAuth 2.0 Token Exchange
 
-### How it works
+## Quick start
 
-When a user calls your MCP server through Smithery:
+<Tabs>
+<Tab title="TypeScript">
 
-1. Smithery detects your server requires authentication (401 response)
-2. Smithery performs OAuth 2.0 Token Exchange with your authorization server
-3. Your server receives a standard `Authorization: Bearer <token>` header
-4. You validate the token and identify/provision the user
-
-This approach is fully compliant with the MCP specification and OAuth 2.0 standards.
-
-## Quick start with Smithery TypeScript SDK
-
-When using the Smithery TypeScript SDK (see [TypeScript deployment guide](/build/deployments/typescript)), user authentication is handled automatically:
+When using the [Smithery TypeScript SDK](/build/deployments/typescript), user authentication is handled automatically:
 
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-export default function createServer({ config, user }) {
+export default function createServer({ config, user }) { // [!code highlight]
   // user contains the authenticated user information:
-  // - user.id: unique identifier from your auth system
-  // - user.email: email address (if available)
-  // - user.name: display name (if available)
+  // - user.id: unique identifier from your auth system // [!code highlight]
+  // - user.email: email address (if available) // [!code highlight]
+  // - user.name: display name (if available) // [!code highlight]
   // - Additional claims from your OAuth provider
   
   const server = new McpServer({
@@ -46,7 +38,7 @@ export default function createServer({ config, user }) {
     name: "get_user_data",
     handler: async () => {
       // User is already authenticated
-      const data = await fetchUserData(user.id);
+      const data = await fetchUserData(user.id); // [!code highlight]
       return { data };
     }
   });
@@ -61,6 +53,43 @@ export default function createServer({ config, user }) {
 - User provisioning
 - Passing the authenticated user to your server
 
+</Tab>
+<Tab title="Python">
+
+When using the [Smithery Python SDK](/build/deployments/python), user authentication is handled automatically:
+
+```python
+from mcp import McpServer
+
+def create_server(config, user): # [!code highlight]
+    # user contains the authenticated user information:
+    # - user.id: unique identifier from your auth system # [!code highlight]
+    # - user.email: email address (if available) # [!code highlight]
+    # - user.name: display name (if available) # [!code highlight]
+    # - Additional claims from your OAuth provider
+    
+    server = McpServer(
+        name="Your Server",
+        version="1.0.0"
+    )
+    
+    @server.tool("get_user_data")
+    async def get_user_data():
+        # User is already authenticated
+        data = await fetch_user_data(user.id) # [!code highlight]
+        return {"data": data}
+    
+    return server
+```
+
+**That's it!** The Smithery SDK handles:
+- OAuth 2.0 token exchange negotiation
+- Token validation
+- Passing the authenticated user to your server
+
+</Tab>
+</Tabs>
+
 ## Manual integration
 
 If you're not using the Smithery TypeScript SDK, you'll need to implement OAuth 2.0 Token Exchange support in your authorization server.
@@ -74,19 +103,19 @@ Add a token exchange endpoint that accepts Smithery ID tokens:
 app.post('/oauth/token', async (req, res) => {
   const { grant_type, subject_token, subject_token_type } = req.body;
   
-  if (grant_type === 'urn:ietf:params:oauth:grant-type:token-exchange') {
+  if (grant_type === 'urn:ietf:params:oauth:grant-type:token-exchange') { // [!code highlight]
     // Verify the incoming Smithery OIDC ID token
-    const smitheryToken = await verifySmitheryIdToken(subject_token);
+    const smitheryToken = await verifySmitheryIdToken(subject_token); // [!code highlight]
     
     if (!smitheryToken) {
       return res.status(400).json({ error: 'invalid_request' });
     }
     
     // Create or lookup user based on Smithery identity
-    const user = await findOrCreateUser({
-      externalId: `smithery:${smitheryToken.sub}`,
-      email: smitheryToken.email
-    });
+    const user = await findOrCreateUser({ // [!code highlight]
+      externalId: `smithery:${smitheryToken.sub}`, // [!code highlight]
+      email: smitheryToken.email // [!code highlight]
+    }); // [!code highlight]
     
     // Issue access token for your MCP server
     const accessToken = await issueAccessToken(user);
@@ -109,9 +138,9 @@ Smithery sends a standard OIDC ID token that must be validated according to Open
 ```typescript
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
-const SMITHERY_JWKS = createRemoteJWKSet(
-  new URL('https://smithery.ai/.well-known/jwks.json')
-);
+const SMITHERY_JWKS = createRemoteJWKSet( // [!code highlight]
+  new URL('https://server.smithery.ai/.well-known/jwks.json') // [!code highlight]
+); // [!code highlight]
 
 async function verifySmitheryIdToken(token: string) {
   try {
@@ -119,15 +148,15 @@ async function verifySmitheryIdToken(token: string) {
     // - Signature verification using RS256
     // - Public key from well-known JWKS
     // - Valid iss, aud, exp, nbf claims
-    const { payload } = await jwtVerify(token, SMITHERY_JWKS, {
-      issuer: 'https://smithery.ai',
-      audience: '@your-org/your-server', // Your server's qualified name
-      algorithms: ['RS256']
-    });
+    const { payload } = await jwtVerify(token, SMITHERY_JWKS, { // [!code highlight]
+      issuer: 'https://server.smithery.ai', // [!code highlight]
+      audience: '@your-org/your-server', // Your server's qualified name // [!code highlight]
+      algorithms: ['RS256'] // [!code highlight]
+    }); // [!code highlight]
     
     return payload;
     // Standard OIDC claims:
-    // - iss: "https://smithery.ai"
+    // - iss: "https://server.smithery.ai"
     // - sub: user identifier
     // - aud: your server's qualified name
     // - exp: expiration time
@@ -179,6 +208,19 @@ const user = await validateAccessToken(token);
 ```
 
 ## Token Exchange flow
+
+### How it works
+
+When a user calls your MCP server through Smithery:
+
+1. Smithery detects your server requires authentication (401 response)
+2. Smithery performs OAuth 2.0 Token Exchange with your authorization server
+3. Your server receives a standard `Authorization: Bearer <token>` header
+4. You validate the token and identify/provision the user
+
+This approach is compliant with the MCP OAuth specification and OAuth 2.0 standards.
+
+### Detailed flow
 
 ```mermaid
 sequenceDiagram
