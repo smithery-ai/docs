@@ -1,5 +1,5 @@
 ---
-title: Smithery Identity (Draft)
+title: Smithery Identity
 description: Authenticate Smithery users in your MCP server
 ---
 
@@ -128,7 +128,7 @@ async function verifySmitheryIdToken(token: string) {
     return payload;
     // Standard OIDC claims:
     // - iss: "https://smithery.ai"
-    // - sub: pairwise user identifier
+    // - sub: user identifier
     // - aud: your server's qualified name
     // - exp: expiration time
     // - nbf: not before time
@@ -160,12 +160,9 @@ Your server needs to advertise token exchange support:
   "token_endpoint": "https://auth.example.com/oauth/token",
   "grant_types_supported": [
     "authorization_code",
-    "urn:ietf:params:oauth:grant-type:token-exchange"
+    "urn:ietf:params:oauth:grant-type:token-exchange" // [!code highlight]
   ],
-  "token_endpoint_auth_methods_supported": ["none"],
-  "subject_token_types_supported": [
-    "urn:ietf:params:oauth:token-type:id_token"
-  ]
+  ...
 }
 ```
 
@@ -211,13 +208,13 @@ sequenceDiagram
 ### ID Token validation
 The Smithery ID token is a standard OIDC ID token that must be validated according to OpenID Connect Core specification:
 - **Algorithm**: RS256 signature verification
-- **Keys**: Public keys available via JWKS at `https://smithery.ai/.well-known/jwks.json`
+- **Keys**: Public keys available via JWKS at `https://server.smithery.ai/.well-known/jwks.json`
 - **Required claims**: `iss`, `aud`, `exp`, `nbf`, `sub`
-- **Issuer**: Must be `https://smithery.ai`
+- **Issuer**: Must be `https://server.smithery.ai`
 - **Audience**: Must match your server's qualified name
 
 ### Privacy
-- The `sub` claim is pairwise - unique to your server
+- The `sub` claim is unique to your server
 - Users cannot be tracked across different MCP servers
 - Only request PII (email, name) if necessary
 
@@ -248,9 +245,9 @@ Token exchange happens once per user session. Smithery caches the resulting acce
 ### Smithery ID Token
 - **Type**: OIDC ID Token (`urn:ietf:params:oauth:token-type:id_token`)
 - **Algorithm**: RS256
-- **Issuer**: `https://smithery.ai`
+- **Issuer**: `https://server.smithery.ai`
 - **Audience**: Your server's qualified name (e.g., `@smithery/weather-server`)
-- **JWKS URL**: `https://smithery.ai/.well-known/jwks.json`
+- **JWKS URL**: `https://server.smithery.ai/.well-known/jwks.json`
 
 ### Token Exchange
 - **Grant Type**: `urn:ietf:params:oauth:grant-type:token-exchange`
