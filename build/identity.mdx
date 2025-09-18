@@ -5,12 +5,12 @@ description: Authenticate Smithery users in your MCP server
 
 ## Overview
 
-Smithery Identity allows your MCP server to identify end users without requiring them to create separate accounts or manage API keys. When users connect to your server through Smithery, we use OAuth 2.0 Token Exchange (RFC 8693) to seamlessly obtain access tokens for your server on behalf of the user. This skips an extra OAuth screen and enables your MCP server to be used purely server-side.
+Smithery Identity allows your MCP server to identify end users without requiring them to create separate accounts or manage API keys. When users connect to your server through Smithery, we seamlessly obtain access tokens for your server on behalf of the user using OAuth 2.0 JWT Authorization Grants [(RFC 7523)](https://datatracker.ietf.org/doc/html/rfc7523). This skips an extra OAuth screen and enables your MCP server to be used purely server-side.
 
 ### Key benefits
 - **Zero-friction onboarding**: Users don't need to sign up separately for your service. This can boost traffic by 30%!
-- **Works with existing auth**: Seamlessly integrates with OAuth 2.0 providers
-- **Spec-compliant**: Uses standard OAuth 2.0 Token Exchange
+- **Works with existing auth**: Seamlessly layers on top of OAuth 2.0
+- **Spec-compliant**: Uses standard OAuth 2.0 JWT Bearer Authorization Grants, compatible with [Enterprise-Ready MCP spec](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/646).
 
 ## Quick start
 
@@ -48,7 +48,7 @@ export default function createServer({ config, user }) { // [!code highlight]
 ```
 
 **That's it!** The Smithery SDK handles:
-- OAuth 2.0 token exchange negotiation
+- OAuth 2.0 JWT authorization grant negotiation
 - Token validation
 - User provisioning
 - Passing the authenticated user to your server
@@ -83,7 +83,7 @@ def create_server(config, user): # [!code highlight]
 ```
 
 **That's it!** The Smithery SDK handles:
-- OAuth 2.0 token exchange negotiation
+- OAuth 2.0 JWT authorization grant negotiation
 - Token validation
 - Passing the authenticated user to your server
 
@@ -92,29 +92,29 @@ def create_server(config, user): # [!code highlight]
 
 ## Manual integration
 
-If you're not using the Smithery TypeScript SDK, you'll need to implement OAuth 2.0 Token Exchange support in your authorization server.
+If you're not using the Smithery TypeScript SDK, you'll need to implement OAuth 2.0 JWT Bearer Authorization Grant support in your authorization server.
 
-### 1. Enable Token Exchange on your OAuth server
+### 1. Enable JWT Bearer Grant on your OAuth server
 
-Add a token exchange endpoint that accepts Smithery ID tokens:
+Add JWT bearer grant support to your token endpoint:
 
 ```typescript
-// Add token exchange support to your OAuth server
+// Add JWT bearer grant support to your OAuth server
 app.post('/oauth/token', async (req, res) => {
-  const { grant_type, subject_token, subject_token_type } = req.body;
+  const { grant_type, assertion } = req.body;
   
-  if (grant_type === 'urn:ietf:params:oauth:grant-type:token-exchange') { // [!code highlight]
-    // Verify the incoming Smithery OIDC ID token
-    const smitheryToken = await verifySmitheryIdToken(subject_token); // [!code highlight]
+  if (grant_type === 'urn:ietf:params:oauth:grant-type:jwt-bearer') { // [!code highlight]
+    // Verify the incoming JWT authorization grant
+    const jwtGrant = await verifyJwtAuthorizationGrant(assertion); // [!code highlight]
     
-    if (!smitheryToken) {
-      return res.status(400).json({ error: 'invalid_request' });
+    if (!jwtGrant) {
+      return res.status(400).json({ error: 'invalid_grant' });
     }
     
-    // Create or lookup user based on Smithery identity
+    // Create or lookup user based on the grant
     const user = await findOrCreateUser({ // [!code highlight]
-      externalId: `smithery:${smitheryToken.sub}`, // [!code highlight]
-      email: smitheryToken.email // [!code highlight]
+      externalId: `smithery:${jwtGrant.sub}`, // [!code highlight]
+      email: jwtGrant.email // [!code highlight]
     }); // [!code highlight]
     
     // Issue access token for your MCP server
@@ -131,9 +131,9 @@ app.post('/oauth/token', async (req, res) => {
 });
 ```
 
-### 2. Verify Smithery ID tokens
+### 2. Verify JWT Authorization Grants
 
-Smithery sends a standard OIDC ID token that must be validated according to OpenID Connect Core specification:
+Validate the JWT authorization grant according to RFC 7523:
 
 ```typescript
 import { createRemoteJWKSet, jwtVerify } from 'jose';
@@ -142,31 +142,30 @@ const SMITHERY_JWKS = createRemoteJWKSet( // [!code highlight]
   new URL('https://server.smithery.ai/.well-known/jwks.json') // [!code highlight]
 ); // [!code highlight]
 
-async function verifySmitheryIdToken(token: string) {
+async function verifyJwtAuthorizationGrant(assertion: string) {
   try {
-    // Validate according to OIDC Core spec:
+    // Validate according to RFC 7523:
     // - Signature verification using RS256
-    // - Public key from well-known JWKS
-    // - Valid iss, aud, exp, nbf claims
-    const { payload } = await jwtVerify(token, SMITHERY_JWKS, { // [!code highlight]
+    // - Public key from issuer's JWKS
+    // - Valid iss, aud, exp, sub claims
+    const { payload } = await jwtVerify(assertion, SMITHERY_JWKS, { // [!code highlight]
       issuer: 'https://server.smithery.ai', // [!code highlight]
-      audience: '@your-org/your-server', // Your server's qualified name // [!code highlight]
+      audience: 'https://your-server.example.com/oauth/token', // Your token endpoint // [!code highlight]
       algorithms: ['RS256'] // [!code highlight]
     }); // [!code highlight]
-    
+        
     return payload;
-    // Standard OIDC claims:
-    // - iss: "https://server.smithery.ai"
+    // Required claims:
+    // - iss: issuer (e.g., "https://server.smithery.ai")
     // - sub: user identifier
-    // - aud: your server's qualified name
+    // - aud: your token endpoint URL
     // - exp: expiration time
-    // - nbf: not before time
     // - iat: issued at time
     // Optional claims:
     // - email: user's email
     // - name: user's name
   } catch (error) {
-    console.error('Invalid Smithery token:', error);
+    console.error('Invalid JWT grant:', error);
     return null;
   }
 }
@@ -174,7 +173,7 @@ async function verifySmitheryIdToken(token: string) {
 
 ### 3. Configure OAuth metadata
 
-Your server needs to advertise token exchange support:
+Your server needs to advertise JWT bearer grant support:
 
 ```json
 // .well-known/oauth-protected-resource
@@ -189,8 +188,9 @@ Your server needs to advertise token exchange support:
   "token_endpoint": "https://auth.example.com/oauth/token",
   "grant_types_supported": [
     "authorization_code",
-    "urn:ietf:params:oauth:grant-type:token-exchange" // [!code highlight]
+    "urn:ietf:params:oauth:grant-type:jwt-bearer" // [!code highlight]
   ],
+  "token_endpoint_auth_signing_alg_values_supported": ["RS256"],
   ...
 }
 ```
@@ -207,18 +207,30 @@ const user = await validateAccessToken(token);
 // Process MCP request with authenticated user context
 ```
 
-## Token Exchange flow
+## How it works
 
-### How it works
-
-When a user calls your MCP server through Smithery:
+When a Smithery-authenticated user calls your MCP server through Smithery:
 
 1. Smithery detects your server requires authentication (401 response)
-2. Smithery performs OAuth 2.0 Token Exchange with your authorization server
+2. Smithery obtains an access token from your authorization server using a JWT Authorization Grant (RFC 7523)
 3. Your server receives a standard `Authorization: Bearer <token>` header
-4. You validate the token and identify/provision the user
+4. You validate the token and identify the user
 
-This approach is compliant with the MCP OAuth specification and OAuth 2.0 standards.
+### Technical details
+
+Smithery uses an **ID-JAG (Identity JWT Authorization Grant)** to authenticate users with your authorization server:
+
+- **Grant type**: `urn:ietf:params:oauth:grant-type:jwt-bearer` 
+- **Transport**: POST to your token endpoint with `assertion` parameter containing the JWT
+- **JWT claims**:
+  - `iss`: Issuer (e.g., `https://server.smithery.ai`)
+  - `sub`: Stable user identifier
+  - `aud`: Your token endpoint URL
+  - `exp`, `iat`: Expiration and issued-at times
+  - `jti`: Unique identifier for replay protection
+  - Optional: `email`, `name` for user profile data
+
+This approach is fully compliant with RFC 7523 and the MCP OAuth specification.
 
 ### Detailed flow
 
@@ -235,8 +247,8 @@ sequenceDiagram
     E-->>S: Protected Resource Metadata
     S->>A: GET /.well-known/oauth-authorization-server
     A-->>S: Authorization Server Metadata
-    alt Token exchange supported
-        S->>A: POST /token RFC 8693<br/>subject_token: Smithery ID token
+    alt JWT Bearer Grant supported
+        S->>A: POST /token (RFC 7523)<br/>grant_type: jwt-bearer<br/>assertion: JWT authorization grant
         A-->>S: Access token for your MCP server
     else Fallback
         S-->>A: Standard OAuth 2.1 flow if needed
@@ -247,13 +259,14 @@ sequenceDiagram
 
 ## Security considerations
 
-### ID Token validation
-The Smithery ID token is a standard OIDC ID token that must be validated according to OpenID Connect Core specification:
+### JWT Grant validation
+The JWT authorization grant must be validated according to RFC 7523:
 - **Algorithm**: RS256 signature verification
 - **Keys**: Public keys available via JWKS at `https://server.smithery.ai/.well-known/jwks.json`
-- **Required claims**: `iss`, `aud`, `exp`, `nbf`, `sub`
-- **Issuer**: Must be `https://server.smithery.ai`
-- **Audience**: Must match your server's qualified name
+- **Required claims**: `iss`, `aud`, `exp`, `sub`, `iat`, `jti`
+- **Issuer**: Must be `https://server.smithery.ai` or your trusted issuer
+- **Audience**: Must be your token endpoint URL
+- **Replay protection**: Track `jti` to ensure single-use
 
 ### Privacy
 - The `sub` claim is unique to your server
@@ -261,14 +274,14 @@ The Smithery ID token is a standard OIDC ID token that must be validated accordi
 - Only request PII (email, name) if necessary
 
 ### Trust relationship
-- By accepting Smithery ID tokens, you trust Smithery's user authentication
+- By accepting JWT authorization grants from Smithery, you trust Smithery's user authentication
 - Consider implementing additional verification for sensitive operations
 
 ## FAQ
 
 ### Do I need my own OAuth server?
 
-If using the Smithery TypeScript SDK, no - it's handled for you. For manual integration, yes - you need an OAuth 2.0 authorization server that supports token exchange.
+If using the Smithery TypeScript SDK, no - it's handled for you. For manual integration, yes - you need an OAuth 2.0 authorization server that supports JWT bearer grants (RFC 7523).
 
 ### What about servers that don't need authentication?
 
@@ -276,28 +289,28 @@ Anonymous servers don't need any of this - Smithery will call them directly with
 
 ### How do I handle existing users?
 
-You can provide an account linking flow where existing users associate their account with their Smithery identity during the first token exchange.
+You can provide an account linking flow where existing users associate their account with their Smithery identity during the first JWT grant validation.
 
 ### What's the performance impact?
 
-Token exchange happens once per user session. Smithery caches the resulting access token according to your server's token lifetime.
+JWT grant authentication happens once per user session. Smithery caches the resulting access token according to your server's token lifetime.
 
 ## Reference
 
-### Smithery ID Token
-- **Type**: OIDC ID Token (`urn:ietf:params:oauth:token-type:id_token`)
+### JWT Authorization Grant (ID-JAG)
+- **Type**: JWT Bearer Authorization Grant
 - **Algorithm**: RS256
 - **Issuer**: `https://server.smithery.ai`
-- **Audience**: Your server's qualified name (e.g., `@smithery/weather-server`)
+- **Audience**: Your token endpoint URL (e.g., `https://auth.example.com/oauth/token`)
 - **JWKS URL**: `https://server.smithery.ai/.well-known/jwks.json`
 
-### Token Exchange
-- **Grant Type**: `urn:ietf:params:oauth:grant-type:token-exchange`
-- **Subject Token Type**: `urn:ietf:params:oauth:token-type:id_token`
+### OAuth Parameters
+- **Grant Type**: `urn:ietf:params:oauth:grant-type:jwt-bearer`
+- **Assertion**: JWT authorization grant
 
 ## Learn more
 
-- [RFC 8693: OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)
+- [RFC 7523: JWT Profile for OAuth 2.0 Client Authentication and Authorization Grants](https://datatracker.ietf.org/doc/html/rfc7523)
 - [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
 - [MCP Authorization Specification](https://modelcontextprotocol.io/docs/spec/authentication)
 - [OAuth 2.0 Protected Resource Metadata](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-resource-metadata)
