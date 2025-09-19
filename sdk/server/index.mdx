@@ -1,0 +1,261 @@
+---
+title: "Server SDK"
+description: "Build MCP servers with the Smithery SDK"
+---
+
+The Smithery SDK provides two server patterns for building MCP servers: stateful and stateless. Choose based on your use case.
+
+## Server Types
+
+<CardGroup>
+  <Card
+    title="Stateful Server"
+    icon="database"
+    href="/sdk/server/stateful"
+  >
+    Maintains session state between requests
+  </Card>
+  <Card
+    title="Stateless Server"
+    icon="cloud"
+    href="/sdk/server/stateless"
+  >
+    Simple servers without session management
+  </Card>
+  <Card
+    title="Session Management"
+    icon="users"
+    href="/sdk/server/sessions"
+  >
+    Built-in session stores and patterns
+  </Card>
+</CardGroup>
+
+## Quick Comparison
+
+| Feature | Stateful | Stateless |
+|---------|----------|-----------|
+| Session persistence | ✅ Yes | ❌ No |
+| Memory usage | Higher | Lower |
+| Complexity | Medium | Low |
+| Use case | Chat, workflows | Simple tools |
+
+## Basic Server Example
+
+### Stateless Server (Simple)
+
+```typescript
+// The SDK does not provide a helper; see /sdk/server/stateless for a pattern
+import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+
+function createMcpServer({ config }) {
+  const server = new Server({
+    name: "simple-server",
+    version: "1.0.0"
+  })
+
+  // Add your tools here
+  
+  return server
+}
+
+// See the stateless pattern implementation: /sdk/server/stateless
+// Example returns an Express app you can .listen() on
+```
+
+### Stateful Server (With Sessions)
+
+```typescript
+import { createStatefulServer } from "@smithery/sdk"
+import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+
+function createMcpServer({ sessionId, config }) {
+  const server = new Server({
+    name: "stateful-server",
+    version: "1.0.0"
+  })
+
+  // Session-specific state
+  const sessionData = {
+    id: sessionId,
+    history: [],
+    context: {}
+  }
+
+  // Add session-aware tools
+  
+  return server
+}
+
+const { app } = createStatefulServer(createMcpServer)
+app.listen(process.env.PORT || 3000)
+```
+
+## Common Patterns
+
+### 1. Tool Registration
+
+```typescript
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js"
+
+function setupTools(server: Server) {
+  // List available tools
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      {
+        name: "get_data",
+        description: "Retrieve data from database",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string" }
+          },
+          required: ["query"]
+        }
+      }
+    ]
+  }))
+
+  // Handle tool calls
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params
+    
+    switch (name) {
+      case "get_data":
+        const result = await queryDatabase(args.query)
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result)
+          }]
+        }
+      default:
+        throw new Error(`Unknown tool: ${name}`)
+    }
+  })
+}
+```
+
+### 2. Resource Management
+
+```typescript
+import {
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js"
+
+function setupResources(server: Server) {
+  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    resources: [
+      {
+        uri: "config://settings",
+        name: "Application Settings",
+        mimeType: "application/json"
+      }
+    ]
+  }))
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    if (request.params.uri === "config://settings") {
+      return {
+        contents: [{
+          uri: "config://settings",
+          mimeType: "application/json",
+          text: JSON.stringify(getSettings())
+        }]
+      }
+    }
+    throw new Error("Resource not found")
+  })
+}
+```
+
+### 3. Error Handling
+
+```typescript
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js"
+
+function createSafeHandler(handler: Function) {
+  return async (request: any) => {
+    try {
+      return await handler(request)
+    } catch (error) {
+      if (error instanceof McpError) {
+        throw error
+      }
+      
+      // Convert to MCP error
+      throw new McpError(
+        ErrorCode.InternalError,
+        error.message || "Internal server error"
+      )
+    }
+  }
+}
+
+// Use in server setup
+server.setRequestHandler(
+  CallToolRequestSchema,
+  createSafeHandler(toolHandler)
+)
+```
+
+## Configuration
+
+Servers can accept configuration through:
+
+1. **Environment variables** - For secrets and deployment config
+2. **Config schemas** - For validated user configuration
+3. **Runtime options** - For session-specific settings
+
+```typescript
+import { z } from "zod"
+
+// Define configuration schema
+export const configSchema = z.object({
+  apiEndpoint: z.string().url().describe("API endpoint URL"),
+  apiKey: z.string().describe("API authentication key"),
+  timeout: z.number().default(30000).describe("Request timeout in ms"),
+  features: z.object({
+    caching: z.boolean().default(true),
+    rateLimit: z.number().default(100)
+  }).optional()
+})
+
+// Use in server
+const app = createStatefulServer(createMcpServer, {
+  schema: configSchema
+})
+```
+
+## Deployment Considerations
+
+### Memory Management
+
+- **Stateless**: Each request creates a new server instance
+- **Stateful**: Server instances persist per session
+- Use session stores to limit memory usage
+- Implement cleanup for long-running servers
+
+### Scaling
+
+- **Horizontal scaling**: Stateless servers scale easily
+- **Session affinity**: Required for stateful servers
+- **Connection limits**: Set based on available resources
+
+### Security
+
+- Validate all inputs with Zod schemas
+- Sanitize configuration values
+- Use API keys for authentication
+- Implement rate limiting
+
+## Next Steps
+
+- Learn about [stateful servers](/sdk/server/stateful)
+- Explore [stateless patterns](/sdk/server/stateless)
+- Implement [session management](/sdk/server/sessions)
+- Add [configuration validation](/sdk/configuration)
