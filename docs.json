@@ -54,7 +54,14 @@
 				"pages": [
 					"use/index",
 					"use/connect",
-					"use/deep-linking"
+					"use/deep-linking",
+					"use/listing_your_client"
+				]
+			},
+			{
+				"group": "Integrations",
+				"pages": [
+					"integrations/vercel_ai_sdk"
 				]
 			},
 			{
@@ -74,16 +81,8 @@
 			},
 			{
 				"group": "Cookbooks",
-				"icon": "chef-hat",
 				"pages": [
 					"cookbooks/typescript_oauth_client"
-				]
-			},
-			{
-				"group": "Integrations",
-				"icon": "link",
-				"pages": [
-					"integrations/vercel_ai_sdk"
 				]
 			},
 			{
