@@ -80,6 +80,13 @@
 				]
 			},
 			{
+				"group": "Integrations",
+				"icon": "link",
+				"pages": [
+					"integrations/vercel_ai_sdk"
+				]
+			},
+			{
 				"group": "Migration Guides",
 				"pages": [
 					{
