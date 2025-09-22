@@ -1,0 +1,352 @@
+---
+title: "Vercel AI SDK Integration"
+description: "Integrate MCP servers with Vercel AI SDK to build dynamic chatbots with real-time tool execution"
+---
+
+## Overview
+
+This example demonstrates how to connect LLMs to MCP tools using the Vercel AI SDK. We'll create a simple chat component that connects to MCP servers and executes tools dynamically. We'll use a simple effect on mount to connect to servers. However, you can easily let users add their own servers by implementing a server management UI or allowing server URLs to be configured through environment variables or user settings.
+
+## Installation
+
+Install the required dependencies:
+
+```bash
+npm install ai @ai-sdk/react @ai-sdk/openai @modelcontextprotocol/sdk @smithery/sdk
+```
+
+## Example
+
+### Client-side Component
+
+Create a chat component that connects to MCP servers and handles tool execution:
+
+```tsx filename='app/page.tsx' highlight={19-47}
+'use client';
+
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
+import { createMCPClient } from '@/lib/mcp/create-client';
+import { createSmitheryUrl } from "@smithery/sdk/shared/config.js";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { Tool as MCPTool } from "@modelcontextprotocol/sdk/types.js";
+
+export default function Home() {
+  const [text, setText] = useState<string>('');
+  const [client, setClient] = useState<Client | null>(null);
+  const [allTools, setAllTools] = useState<MCPTool[]>([]);
+  
+  // Connect to MCP server on mount
+  // This is for demo - in your application you might want to let users dynamically add their servers
+  useEffect(() => {
+    const connectToMCP = async () => {
+      try {
+        // Replace with your server details
+        const serverUrl = 'https://server.smithery.ai/{server_id}'; 
+        const apiKey = '{your_api_key}'; // [!code highlight]
+        const profile = '{your_profile}'; // [!code highlight]
+        
+        const connectionUrl = createSmitheryUrl(serverUrl, { 
+          apiKey, // [!code highlight]
+          profile, // [!code highlight]
+        }); // [!code highlight]
+        
+        const result = await createMCPClient(new URL(connectionUrl));
+        
+        if (!result.ok) {
+          throw result.error;
+        }
+        
+        const { client } = result.value;
+        setClient(client);
+        
+        // Get available tools
+        try {
+          const toolsResult = await client.listTools();
+          setAllTools(toolsResult.tools || []);
+        } catch (toolsError) {
+          console.warn('Failed to list tools:', toolsError);
+          setAllTools([]);
+        }
+        
+      } catch (error) {
+        console.error('Failed to connect to MCP server:', error);
+      }
+    };
+    
+    connectToMCP();
+    
+    // Cleanup on unmount
+    return () => {
+      if (client) {
+        client.close().catch(console.error);
+      }
+    };
+  }, []);
+  
+  // Use a ref to store the latest handler to avoid stale closures
+  const handleToolCallRef = useRef<((params: any) => Promise<void>) | null>(null);
+  
+  // Stable wrapper that always calls the latest version
+  const handleToolCall = useCallback(async (params: any) => {
+    return handleToolCallRef.current?.(params);
+  }, []);
+
+  // Configure useChat with MCP tool handling
+  const { messages, sendMessage, status, addToolResult } = useChat({ // [!code highlight]
+    transport: new DefaultChatTransport({ // [!code highlight]
+      api: '/api/chat', // [!code highlight]
+    }), // [!code highlight]
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls, // [!code highlight]
+    onToolCall: handleToolCall, // [!code highlight]
+  }); // [!code highlight]
+
+  // Update the ref with the latest implementation
+  handleToolCallRef.current = async ({ toolCall }: any) => {
+    // Check if it's a dynamic tool first for proper type narrowing
+    if (toolCall.dynamic) {
+      return;
+    }
+    
+    try {
+      if (!client) {
+        throw new Error('MCP client not connected');
+      }
+      
+      // Execute the tool using the MCP client
+      const result = await client.callTool({ // [!code highlight]
+        name: toolCall.toolName, // [!code highlight]
+        arguments: toolCall.input || {} // [!code highlight]
+      }); // [!code highlight]
+      
+      // Extract text content from the result
+      let output = 'Tool executed successfully';
+      if (result.content && Array.isArray(result.content)) {
+        const textContent = result.content
+          .filter(item => item.type === 'text')
+          .map(item => item.text)
+          .join('\n');
+        output = textContent || output;
+      }
+      
+      // Add the MCP result back to the conversation
+      addToolResult({
+        toolCallId: toolCall.toolCallId,
+        tool: toolCall.toolName,
+        output,
+      });
+    } catch (error) {
+      // Add error result
+      addToolResult({
+        toolCallId: toolCall.toolCallId,
+        tool: toolCall.toolName,
+        output: { 
+          error: 'Tool execution failed', 
+          message: error instanceof Error ? error.message : 'Unknown error' 
+        },
+      });
+    }
+  };
+
+  const handleSendMessage = useCallback(async () => {
+    if (!text.trim() || status === 'streaming') return;
+    
+    // Pass the current tools state to the API
+    sendMessage({ text }, { 
+      body: {
+        tools: allTools,
+      }
+    });
+    
+    setText('');
+  }, [text, status, sendMessage, allTools]);
+
+  return (
+    <div className="flex flex-col h-screen max-w-4xl mx-auto">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {messages.map((message) => (
+          <div key={message.id} className="mb-4">
+            <div className="font-semibold mb-2">
+              {message.role === 'user' ? 'You' : 'Assistant'}:
+            </div>
+            
+            {message.parts.map((part, i) => {
+              switch (part.type) {
+                case 'text':
+                  return (
+                    <div key={`${message.id}-${i}`} className="prose">
+                      {part.text}
+                    </div>
+                  );
+                
+                default:
+                  // Handle tool call parts generically
+                  if (part.type.startsWith('tool-') && 'toolCallId' in part) {
+                    const toolPart = part as any;
+                    const callId = toolPart.toolCallId;
+                    const toolName = part.type.replace('tool-', '');
+                    
+                    if ('state' in toolPart) {
+                      switch (toolPart.state) {
+                        case 'input-streaming':
+                          return (
+                            <div key={callId} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              Preparing {toolName}...
+                            </div>
+                          );
+                        case 'input-available':
+                          return (
+                            <div key={callId} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              Executing {toolName}...
+                            </div>
+                          );
+                        case 'output-available':
+                          return (
+                            <div key={callId} className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                              <strong>{toolName} result:</strong> {toolPart.output}
+                            </div>
+                          );
+                        case 'output-error':
+                          return (
+                            <div key={callId} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                              Error in {toolName}: {toolPart.errorText}
+                            </div>
+                          );
+                      }
+                    }
+                  }
+                  return null;
+              }
+            })}
+          </div>
+        ))}
+        
+        {status === 'streaming' && (
+          <div className="mb-4">
+            <div className="font-semibold mb-2">Assistant:</div>
+            <div className="animate-pulse">Thinking...</div>
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
+      <div className="p-4 border-t">
+        <div className="flex gap-2">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Ask anything..."
+            className="flex-1 p-3 border border-gray-300 rounded-lg"
+            disabled={status === 'streaming'}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!text.trim() || status === 'streaming'}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### API Route
+
+Create an API route that handles MCP tool integration:
+
+```tsx filename='app/api/chat/route.ts'
+import { streamText, UIMessage, convertToModelMessages, jsonSchema } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import type { Tool as MCPTool } from "@modelcontextprotocol/sdk/types.js";
+import type { JSONSchema7 } from "json-schema";
+
+// Allow streaming responses up to 30 seconds
+export const maxDuration = 30;
+
+export async function POST(req: Request) {
+  const { 
+    model, 
+    messages,
+    tools,
+  }: { 
+    messages: UIMessage[]; 
+    model?: string;
+    tools?: MCPTool[];
+  } = await req.json();
+
+  // Convert MCP tools to AI SDK format
+  const aiTools = Object.fromEntries( // [!code highlight]
+    (tools || []).map(tool => [ // [!code highlight]
+      tool.name, // [!code highlight]
+      { // [!code highlight]
+        description: tool.description || tool.name, // [!code highlight]
+        inputSchema: jsonSchema(tool.inputSchema as JSONSchema7), // [!code highlight]
+      }, // [!code highlight]
+    ]), // [!code highlight]
+  ); // [!code highlight]
+
+  const result = streamText({
+    model: openai(model || 'gpt-4o-mini'),
+    messages: convertToModelMessages(messages),
+    system: 'You are a helpful assistant with access to various tools through MCP (Model Context Protocol). Use the available tools to help users with their requests.',
+    tools: aiTools,
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+
+## Advanced Configuration
+
+### Multiple MCP Servers
+
+You can connect to multiple MCP servers and aggregate their tools:
+
+```tsx
+const [clients, setClients] = useState<Client[]>([]);
+const [allTools, setAllTools] = useState<MCPTool[]>([]);
+
+useEffect(() => {
+  const connectToMultipleMCP = async () => {
+    const urls = [
+      'https://server1.example.com/mcp',
+      'https://server2.example.com/mcp',
+    ];
+    
+    const connectedClients: Client[] = [];
+    const allTools: MCPTool[] = [];
+    
+    for (const url of urls) {
+      try {
+        const result = await createMCPClient(new URL(url));
+        if (result.ok) {
+          const { client } = result.value;
+          connectedClients.push(client);
+          
+          const toolsResult = await client.listTools();
+          allTools.push(...(toolsResult.tools || []));
+        }
+      } catch (error) {
+        console.error(`Failed to connect to ${url}:`, error);
+      }
+    }
+    
+    setClients(connectedClients);
+    setAllTools(allTools);
+  };
+  
+  connectToMultipleMCP();
+}, []);
+```
