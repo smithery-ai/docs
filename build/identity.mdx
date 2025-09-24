@@ -213,8 +213,9 @@ When a Smithery-authenticated user calls your MCP server through Smithery:
 
 1. Smithery detects your server requires authentication (401 response)
 2. Smithery obtains an access token from your authorization server using a JWT Authorization Grant (RFC 7523)
-3. Your server receives a standard `Authorization: Bearer <token>` header
-4. You validate the token and identify the user
+3. Smithery retries the request with the newly-obtained access token
+4. Your server receives the access token in a standard `Authorization: Bearer <token>` header
+5. You validate the token and identify the user
 
 ### Technical details
 
