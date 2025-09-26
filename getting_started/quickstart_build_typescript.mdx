@@ -29,6 +29,20 @@ npm create smithery
 
 This retrieves and executes the [Create Smithery](https://github.com/smithery-ai/create-smithery) initializer package, which sets up a TypeScript MCP server scaffold with example code and all necessary dependencies.
 
+<Note>
+The scaffold installs everything you need, including:
+
+- `@smithery/cli` as a dev dependency (`npm run dev`/`npm run build` use the local CLI)
+- `@modelcontextprotocol/sdk` and `@smithery/sdk` as runtime dependencies
+
+If you add the CLI to an existing project manually, run:
+
+```bash
+npm i -D @smithery/cli
+npm i @modelcontextprotocol/sdk @smithery/sdk
+```
+</Note>
+
 ### 2. Edit the Server
 
 In `src/index.ts`, you'll see a default server that says hello to a given name. Edit it to add your own tools, resources, and prompts.

@@ -401,13 +401,27 @@ Configure `package.json` for both HTTP and STDIO workflows:
     "start:stdio": "node dist/index.js" // [!code highlight]
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.11.0",
+    "@modelcontextprotocol/sdk": "^1.18.2",
+    "@smithery/sdk": "^1.6.4",
     "express": "^4.18.0",
     "cors": "^2.8.5",
-    "zod": "^3.22.0"
+    "zod": "^3.25.46"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "@smithery/cli": "^1.4.0"
   }
 }
 ```
+
+<Tip>
+Install your dependencies:
+
+```bash
+npm i @modelcontextprotocol/sdk @smithery/sdk express cors zod
+npm i -D @smithery/cli tsx typescript
+```
+</Tip>
 
 ## Local Testing
 

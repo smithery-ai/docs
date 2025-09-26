@@ -186,18 +186,22 @@ Configure `package.json` so Smithery CLI can find your exported server and add s
   "type": "module",
   "module": "src/index.ts", // [!code highlight]
   "scripts": {
-    "dev": "npx @smithery/cli dev",
+    "dev": "smithery dev",
     "build": "npm run build:http",
     "build:stdio": "tsc",
-    "build:http": "npx @smithery/cli build", // [!code highlight]
+    "build:http": "smithery build", // [!code highlight]
     "start": "npm run start:http",
     "start:http": "node .smithery/index.cjs",
     "start:stdio": "node dist/index.js",
     "prepublishOnly": "npm run build:stdio"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.17.3",
+    "@modelcontextprotocol/sdk": "^1.18.2",
+    "@smithery/sdk": "^1.6.4",
     "zod": "^3.25.46"
+  },
+  "devDependencies": {
+    "@smithery/cli": "^1.4.0"
   }
 }
 ```
@@ -251,6 +255,20 @@ That's it! The Smithery CLI handles the HTTP transport automatically.
 <Note>
 **No Dockerfile needed**: Unlike custom container deployments, TypeScript projects using Smithery CLI don't require a Dockerfile. The CLI handles containerization automatically.
 </Note>
+
+<Tip>
+Install the CLI locally with:
+
+```bash
+npm i -D @smithery/cli
+```
+
+Add your SDK dependency explicitly:
+
+```bash
+npm i @modelcontextprotocol/sdk @smithery/sdk
+```
+</Tip>
 
 ## Local Testing
 
