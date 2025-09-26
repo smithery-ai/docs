@@ -12,6 +12,7 @@ Deploy TypeScript MCP servers using the official MCP SDK with automatic containe
 
 - TypeScript MCP server using the official MCP SDK that exports the MCP server object at entry point
 - Node.js 18+ and npm installed locally
+- Smithery CLI installed as a dev dependency (`npm i -D @smithery/cli`)
 
 <Note>
 **New to MCP servers?** See the [Getting Started guide](/getting_started) to learn how to build TypeScript MCP servers from scratch using the official SDK.
@@ -53,15 +54,28 @@ Your `package.json` must include the `module` field pointing to your server entr
   "type": "module",
   "module": "src/index.ts",  // Points to your server entry point
   "scripts": {
-    "build": "npx @smithery/cli build",
-    "dev": "npx @smithery/cli dev"
+    "build": "smithery build",
+    "dev": "smithery dev"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.3",
     "zod": "^3.25.46"
+  },
+  "devDependencies": {
+    "@smithery/cli": "^1.4.0"
   }
 }
 ```
+
+<Note>
+Install the CLI locally with:
+
+```bash
+npm i -D @smithery/cli
+```
+
+The Smithery CLI externalizes your SDKs during bundling so your runtime uses the versions you install. If you see a warning about missing SDKs, add them to your dependencies (most servers need `@modelcontextprotocol/sdk` and `@smithery/sdk`).
+</Note>
 
 ### 3. Ensure Proper Server Structure
 
