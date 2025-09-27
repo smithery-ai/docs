@@ -14,81 +14,67 @@ Smithery Identity allows your MCP server to identify end users without requiring
 
 ## Quick start
 
-<Tabs>
-<Tab title="TypeScript">
-
-When using the [Smithery TypeScript SDK](/build/deployments/typescript), user authentication is handled automatically:
+Implement ID-JAG by exporting `identity` to mint access tokens and `oauth` to verify them.
 
 ```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js"
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import type { IdentityHandler } from "@smithery/sdk/server/auth/identity.js"
+import type { TokenVerifier } from "@smithery/sdk"
+import { SignJWT, jwtVerify } from "jose"
 
-export default function createServer({ config, user }) { // [!code highlight]
-  // user contains the authenticated user information:
-  // - user.id: unique identifier from your auth system // [!code highlight]
-  // - user.email: email address (if available) // [!code highlight]
-  // - user.name: display name (if available) // [!code highlight]
-  // - Additional claims from your OAuth provider
-  
-  const server = new McpServer({
-    name: "Your Server",
-    version: "1.0.0",
-  });
-  
-  server.addTool({
-    name: "get_user_data",
-    handler: async () => {
-      // User is already authenticated
-      const data = await fetchUserData(user.id); // [!code highlight]
-      return { data };
+const HMAC_SECRET = new TextEncoder().encode(process.env.MY_SERVER_SECRET ?? "dev-secret")
+
+export default function createServer({ auth }: { auth: AuthInfo }) {
+  const server = new McpServer({ name: "My MCP Server", version: "1.0.0" })
+  const userId = typeof auth?.extra?.userId === "string" ? auth.extra.userId : undefined // [!code highlight]
+
+  server.tool(
+    "whoami",
+    "Return the authenticated user id",
+    {},
+    async () => {
+      return { content: [{ type: "text", text: JSON.stringify({ userId }) }] }
+    },
+  )
+
+  return server.server
+}
+
+export const identity: IdentityHandler = { // [!code highlight]
+  handleJwtGrant: async claims => {
+    if (!claims.sub) return null
+    // Smithery provides a set of claims about the user to your server
+
+    // Mint an access token for your MCP using your own signing
+    const token = await new SignJWT({ userId: claims.sub })
+      .setProtectedHeader({ alg: "HS256" })
+      .setExpirationTime("1h")
+      .sign(HMAC_SECRET)
+
+    return {
+      access_token: token,
+      token_type: "Bearer",
+      expires_in: 3600,
+      extra: { userId: claims.sub }, // forwarded to createServer via auth.extra
     }
-  });
-  
-  return server.server;
+  },
+}
+
+export const oauth: TokenVerifier = { // [!code highlight]
+  verifyAccessToken: async token => {
+    const { payload } = await jwtVerify(token, HMAC_SECRET)
+    const userIdClaim = typeof payload.userId === "string" ? payload.userId : undefined
+    return {
+      clientId: "my-mcp",
+      token,
+      scopes: [],
+      expiresAt: payload.exp ? payload.exp * 1000 : undefined,
+      extra: { userId: userIdClaim }, // available as auth.extra in createServer
+    }
+  },
 }
 ```
-
-**That's it!** The Smithery SDK handles:
-- OAuth 2.0 JWT authorization grant negotiation
-- Token validation
-- User provisioning
-- Passing the authenticated user to your server
-
-</Tab>
-<Tab title="Python">
-
-When using the [Smithery Python SDK](/build/deployments/python), user authentication is handled automatically:
-
-```python
-from mcp import McpServer
-
-def create_server(config, user): # [!code highlight]
-    # user contains the authenticated user information:
-    # - user.id: unique identifier from your auth system # [!code highlight]
-    # - user.email: email address (if available) # [!code highlight]
-    # - user.name: display name (if available) # [!code highlight]
-    # - Additional claims from your OAuth provider
-    
-    server = McpServer(
-        name="Your Server",
-        version="1.0.0"
-    )
-    
-    @server.tool("get_user_data")
-    async def get_user_data():
-        # User is already authenticated
-        data = await fetch_user_data(user.id) # [!code highlight]
-        return {"data": data}
-    
-    return server
-```
-
-**That's it!** The Smithery SDK handles:
-- OAuth 2.0 JWT authorization grant negotiation
-- Token validation
-- Passing the authenticated user to your server
-
-</Tab>
-</Tabs>
 
 ## Manual integration
 
