@@ -113,6 +113,33 @@ export const configSchema = z.object({
 
 **What it does**: Automatically generates [session configuration](/build/session-config) forms for users connecting to your server.
 
+## OAuth
+
+<Note>
+OAuth support in the TypeScript SDK and CLI is in beta and may change.
+</Note>
+
+If your entry module exports `oauth`, Smithery CLI auto-mounts the required OAuth endpoints for you.
+
+### Export an OAuth provider
+```typescript
+// src/index.ts
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js"
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import type { OAuthProvider } from "@smithery/sdk"
+import { MyProvider } from "./provider.js"
+
+export default function createServer({ auth }: { auth: AuthInfo }) {
+  const server = new McpServer({ name: "My MCP", version: "1.0.0" })
+  // register tools...
+  return server.server
+}
+
+export const oauth: OAuthProvider = new MyProvider() // [!code highlight]
+```
+
+The CLI detects `oauth` and injects the auth routes automatically.
+
 ## Local Development
 
 Test your server locally using the Smithery CLI:
