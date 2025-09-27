@@ -10,9 +10,14 @@ Deploy Python MCP servers using FastMCP with automatic containerization and infr
 
 ## Prerequisites
 
-- Python MCP server using FastMCP (1.0 or 2.0 supported) that exports a server creation function
+- Python MCP server using FastMCP that exports a server creation function
 - Python 3.12+ installed locally
 - A Python package manager: [uv](https://docs.astral.sh/uv/) (recommended), poetry, or pip
+
+### FastMCP Compatibility
+
+When using FastMCP, ensure you have compatible versions:
+- `mcp>=1.6.0` OR `fastmcp>=2.0.0`
 
 <Note>
 **New to MCP servers?** See the [Getting Started guide](/getting_started) to learn how to build Python MCP servers from scratch using FastMCP.
@@ -60,8 +65,8 @@ description = "My MCP server"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "mcp>=1.13.0",
-    "smithery>=0.1.23",
+    "mcp>=1.15.0",
+    "smithery>=0.4.2",
 ]
 
 [project.scripts]
