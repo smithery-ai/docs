@@ -106,6 +106,43 @@ RUN npm run build
 CMD ["node", "dist/index.js"]
 ```
 
+```dockerfile Node.js/TypeScript (Monorepo with Turbo)
+FROM node:22-slim
+
+ARG TURBO_TEAM
+ENV TURBO_TEAM=$TURBO_TEAM
+ 
+ARG TURBO_TOKEN
+ENV TURBO_TOKEN=$TURBO_TOKEN
+
+# Set working directory
+WORKDIR /app
+
+# Copy root package.json and lockfile
+COPY package*.json ./
+
+# Copy turbo.json for build configuration
+COPY turbo.json ./
+
+# Copy shared packages (adjust paths as needed)
+COPY packages/ ./packages/
+
+# Copy the specific app
+COPY apps/my-mcp-server/ ./apps/my-mcp-server/
+
+# Install dependencies from monorepo root
+RUN npm ci
+
+# Build using Turborepo (builds dependencies in correct order)
+RUN npx turbo build --filter=my-mcp-server
+
+# Expose the port your app runs on
+EXPOSE 8080
+
+# Start the application from root directory to maintain module resolution
+CMD ["node", "apps/my-mcp-server/dist/index.cjs"]
+```
+
 ```dockerfile Python
 FROM python:3.11-slim
 
