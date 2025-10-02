@@ -166,6 +166,38 @@ CMD ["uv", "run", "python", "main.py"]
 
 </CodeGroup>
 
+## Monorepo Considerations
+
+If you're working with a monorepo (using tools like Turbo, Lerna, or Nx), you'll need to adjust your configuration:
+
+### smithery.yaml for Monorepo
+
+For monorepos, you may need to specify a custom Docker build path that includes the entire repository context:
+
+```yaml
+runtime: "container"
+build:
+  dockerfile: "apps/my-mcp-server/Dockerfile"  # Path to your Dockerfile
+  dockerBuildPath: "../../"                   # Build from repository root
+startCommand:
+  type: "http"
+```
+
+### Dockerfile Patterns
+
+The monorepo Dockerfile example above shows the key patterns:
+
+- **Copy the entire monorepo structure**: Include `packages/`, `apps/`, and root configuration files
+- **Use Turbo build arguments**: Pass `TURBO_TEAM` and `TURBO_TOKEN` if using Turbo Cloud
+- **Build with dependency awareness**: Use `npx turbo build --filter=your-app` to build only your app and its dependencies
+- **Maintain module resolution**: Start the application from the root directory to preserve workspace module resolution
+
+### Common Monorepo Issues
+
+- **Build context**: Ensure your `dockerBuildPath` includes all necessary workspace dependencies
+- **File copying**: Copy shared packages and configuration files before building
+- **Module resolution**: Start your application from the correct working directory to maintain import paths
+
 ## Deploy
 
 1. Push your code (including `smithery.yaml` and `Dockerfile`) to GitHub
