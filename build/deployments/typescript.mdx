@@ -1,12 +1,15 @@
 ---
 title: 'TypeScript Servers'
-description: 'Deploy TypeScript MCP servers on Smithery with automatic builds using Smithery CLI.'
+description: 'Deploy and publish TypeScript MCP servers on Smithery using Smithery CLI'
 icon: 'braces'
 ---
 
 ## Overview
 
-Deploy TypeScript MCP servers using the official MCP SDK with automatic containerization and infrastructure managed by Smithery.
+Deploy TypeScript MCP servers using the official MCP SDK with two deployment options:
+
+- **Remote deployment**: Automatic containerization and infrastructure managed by Smithery
+- **Local servers** (Beta): Distribute your server as [MCP bundle](https://github.com/anthropics/mcpb) allowing users to run it locally and one-click install it
 
 ## Prerequisites
 
@@ -37,11 +40,22 @@ my-mcp-server/
 
 Create a `smithery.yaml` file in your repository root (usually where the `package.json` is):
 
+#### Remote Deployment (Default)
 ```yaml
 runtime: "typescript"
 ```
 
-That's it! This minimal configuration is intentional - Smithery handles containerization, and deployment automatically for TypeScript projects.
+#### Local Server (Beta)
+```yaml
+runtime: "typescript"
+target: "local"
+```
+
+<Note>
+**Local servers are in beta** - When you set `target: "local"`, your server runs locally on your machine but is accessible through Smithery's registry for easy discovery and connection by MCP clients.
+</Note>
+
+For remote deployment, this minimal configuration is intentional - Smithery handles containerization and deployment automatically for TypeScript projects.
 
 ### 2. Configure package.json
 
@@ -54,15 +68,15 @@ Your `package.json` must include the `module` field pointing to your server entr
   "type": "module",
   "module": "src/index.ts",  // Points to your server entry point
   "scripts": {
-    "build": "smithery build",
-    "dev": "smithery dev"
+    "build": "npx smithery build",
+    "dev": "npx smithery dev"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.3",
     "zod": "^3.25.46"
   },
   "devDependencies": {
-    "@smithery/cli": "^1.4.2"
+    "@smithery/cli": "^1.4.6"
   }
 }
 ```
@@ -116,10 +130,10 @@ export const configSchema = z.object({
 ## OAuth
 
 <Note>
-OAuth support in the TypeScript SDK and CLI is in beta and may change.
+OAuth is designed only for **remote servers** and is in beta. OAuth is not available for local servers (`target: "local"`).
 </Note>
 
-If your entry module exports `oauth`, Smithery CLI auto-mounts the required OAuth endpoints for you.
+If your entry module exports `oauth`, Smithery CLI auto-mounts the required OAuth endpoints for you during remote deployment.
 
 ### Export an OAuth provider
 ```typescript
@@ -208,7 +222,7 @@ Configuration applies to both `build` and `dev` commands.
 ## Good to Know
 
 <Accordion title="What happens under the hood">
-When you deploy, Smithery will:
+**Remote Deployment**: When you deploy to Smithery's infrastructure:
 
 1. Clone your repository
 2. Parse your `smithery.yaml` to detect TypeScript runtime
@@ -219,13 +233,21 @@ When you deploy, Smithery will:
 7. Send MCP `initialize` and `list_tools` messages with a dummy configuration to discover your server's capabilities
 8. Make it available at `https://server.smithery.ai/your-server/mcp`
 9. Handle load balancing, scaling, and monitoring
+
+**Local Server (Beta)**: When you use `target: "local"`:
+
+1. Your server runs locally on your machine using `npm run dev`
+2. Smithery registers your server in the registry for discovery
+3. MCP clients can find and connect to your local server through Smithery
+4. Your server remains under your control while being accessible to others
 </Accordion>
 
 ## Troubleshooting
 
 <Accordion title="Why does my deployment fail?">
-Common deployment failures and solutions:
+Common issues and solutions:
 
+**Remote Deployment Issues**:
 - **Missing module field**: Ensure your `package.json` has the `module` field pointing to your entry point
 - **Dependencies not found**: All dependencies must be listed in `dependencies` or `devDependencies`
 - **Server doesn't build locally**: Before deploying, verify your server builds and runs locally:
@@ -234,4 +256,9 @@ Common deployment failures and solutions:
   npm run build
   ```
   If this fails, fix any TypeScript compilation errors or missing dependencies first
+
+**Local Server Issues** (Beta):
+- **Server not discoverable**: Ensure you have `target: "local"` in your `smithery.yaml`
+- **Local server won't start**: Verify your server runs with `npm run dev` before expecting registry integration
+- **Connection issues**: Make sure your local development environment allows the necessary network connections
 </Accordion>
