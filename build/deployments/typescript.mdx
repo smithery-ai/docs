@@ -52,10 +52,8 @@ target: "local"
 ```
 
 <Note>
-**Local servers are in beta** - When you set `target: "local"`, your server runs locally on your machine but is accessible through Smithery's registry for easy discovery and connection by MCP clients.
+**Local servers are in beta** - When you set `target: "local"`, your server runs locally on user's machine but is accessible through Smithery's registry for easy discovery and connection by MCP clients.
 </Note>
-
-For remote deployment, this minimal configuration is intentional - Smithery handles containerization and deployment automatically for TypeScript projects.
 
 ### 2. Configure package.json
 
@@ -236,7 +234,7 @@ Configuration applies to both `build` and `dev` commands.
 
 **Local Server (Beta)**: When you use `target: "local"`:
 
-1. Your server runs locally on your machine using `npm run dev`
+1. Your server runs locally on user's machine using `npm run dev`
 2. Smithery registers your server in the registry for discovery
 3. MCP clients can find and connect to your local server through Smithery
 4. Your server remains under your control while being accessible to others
