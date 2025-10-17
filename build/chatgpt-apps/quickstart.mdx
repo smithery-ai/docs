@@ -1,0 +1,106 @@
+---
+title: "Quickstart"
+description: "Get your first ChatGPT app running in under 5 minutes"
+---
+
+### Prerequisites
+
+Before you begin, make sure you have:
+
+- **Node.js 18+** installed (or Python 3.10+ for Python projects)
+- **Basic React knowledge** - Familiarity with React components and hooks
+- **Smithery API key** - Get one free at [smithery.ai](https://smithery.ai)
+- **MCP concepts** - Understanding of [MCP basics](/concepts/what_is_mcp)
+
+### 1. Create Your App
+
+Use the ChatGPT app template to scaffold a complete project:
+
+```bash
+npm create smithery@latest my-app -- --template chatgpt-app
+cd my-app
+```
+
+### 2. Start Development
+
+```bash
+npm run dev
+```
+
+This starts the development server with:
+- Hot reload for server and widget code
+- Automatic rebuilds on file changes
+- Local testing environment
+
+Now try prompting: "Say hello world!" and watch your widget appear!
+
+<img src="/images/hello.png" alt="Hello widget example" style={{ border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+
+### 3. Project Structure
+
+Your new project has this structure:
+
+```
+my-app/
+├── app/
+│   ├── server/
+│   │   └── index.ts           # MCP server code
+│   ├── shared/
+│   │   └── types.ts           # Shared types (best practice)
+│   └── web/
+│       └── src/
+│           └── widget.tsx     # React widget code
+├── smithery.yaml              # Configuration
+└── package.json
+```
+
+<Tip>
+**Best Practice: Shared Types**
+
+Use the `app/shared/` folder for TypeScript interfaces that are used by both server and client code. This gives you end-to-end type safety from tool response to React component.
+</Tip>
+
+---
+
+## Understanding the Template
+
+The template includes a complete working example showing the basic contract:
+
+**Server** (`app/server/index.ts`)
+- Define tools using `widget.resource()` from `@smithery/sdk`
+- Return responses with `structuredData` for your widget
+
+**Client** (`app/web/src/widget.tsx`)
+- React component that reads data via `useToolOutput()` hook
+- Responds to theme changes with `useTheme()`
+
+**Shared** (`app/shared/types.ts`)
+- TypeScript interfaces used by both server and client
+
+---
+
+## What's Next?
+
+Now that you have a working app, dive deeper:
+
+<CardGroup cols={2}>
+  <Card
+    title="Core Concepts"
+    href="/build/chatgpt-apps/core-concepts"
+  >
+    Learn about the three-layer architecture and data flow
+  </Card>
+  <Card
+    title="Development Guide"
+    href="/build/chatgpt-apps/development-guide"
+  >
+    Explore the full server and client API
+  </Card>
+</CardGroup>
+
+### Additional Resources
+
+- **[Smithery SDK Examples](https://github.com/smithery-ai/sdk/tree/main/examples)** - Complete working examples including tic-tac-toe, kanban board, and cafe explorer
+- **[OpenAI Apps SDK Documentation](https://developers.openai.com/apps-sdk/)** - Official OpenAI documentation for building ChatGPT apps
+- **[OpenAI Apps SDK Reference](https://developers.openai.com/apps-sdk/reference)** - Complete API and SDK reference for `window.openai`, tool descriptors, and metadata fields
+

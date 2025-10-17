@@ -1,0 +1,179 @@
+---
+title: "Core Concepts"
+description: "Understand the architecture and mental model of ChatGPT apps"
+---
+
+<Note>
+**Beta Notice**
+
+Smithery CLI support and Smithery Playground support for ChatGPT apps are currently in beta. The API and SDK may change as we gather feedback and improve the platform. We recommend building with awareness that updates may require changes to your code.
+</Note>
+
+### Three-Layer Architecture
+
+ChatGPT apps use a three-layer architecture:
+
+```
+[ChatGPT Host / AI Client]
+         |
+         | window.openai API
+         v
+[Sandboxed Iframe (Your Widget)]
+         |
+         | MCP Protocol
+         v
+[Your MCP Server]
+```
+
+**Layer 1: ChatGPT Host**
+- Manages the conversation and message flow
+- Provides `window.openai` API to your widget
+- Handles theme (light/dark), locale, and display mode
+
+**Layer 2: Sandboxed Iframe**
+- Your React component runs here
+- Isolated from the host page for security
+- Limited API surface - only `window.openai` for communication
+
+**Layer 3: MCP Server**
+- Defines tools and resources (standard MCP)
+- Executes business logic
+- Returns widget-compatible responses
+
+### MCP Server Components
+
+ChatGPT apps use standard MCP concepts with special conventions:
+
+#### Resources - Widget Templates
+
+Resources define the HTML template that loads your widget:
+
+```typescript
+const greeterWidget = widget.resource<GreeterState>({
+  name: "greeter",
+  description: "A simple greeting widget",
+})
+
+// Automatically creates:
+// - URI: ui://widget/greeter.html
+// - MIME type: text/html+skybridge
+// - HTML template with your bundled JavaScript
+```
+
+<Note>
+**What's happening under the hood?**
+
+The Smithery SDK automatically:
+- Generates the URI: `ui://widget/greeter.html`
+- Reads your widget bundle from `.smithery/greeter.js`
+- Creates an HTML template with a mounting point: `<div id="greeter-root"></div>`
+- Injects your bundled JavaScript
+- Handles all the MCP resource boilerplate
+</Note>
+
+#### Tools - Callable Functions
+
+Tools define what your server can do and which widget to display:
+
+```typescript
+server.registerTool(
+  "say-hello",
+  {
+    title: "Say Hello",
+    description: "Greet someone by name",
+    inputSchema: {
+      name: z.string().describe("Name to greet"),
+    },
+    _meta: greeterWidget.toolConfig({
+      invoking: "Preparing greeting...",  // Status while executing
+      invoked: "Greeting ready!",         // Status after completion
+    }),
+  },
+  async ({ name }) => {
+    // Tool implementation
+  }
+)
+```
+
+The `toolConfig()` helper adds the necessary metadata to link the tool to your widget.
+
+#### Tool Response Structure
+
+This is the most important concept for ChatGPT apps. Every tool returns three fields:
+
+```typescript
+return greeterWidget.response({
+  // 1. structuredData - Visible to BOTH model and widget
+  structuredData: {
+    name: "Alice",
+    greeting: "Hello, Alice!",
+  },
+  
+  // 2. message - Text for model conversation only
+  message: "Said hello to Alice",
+  
+  // 3. meta - Internal data for widget only (optional)
+  meta: {
+    fullDataset: [...],  // Large data not needed by model
+    uiConfig: {...},     // Widget-specific settings
+  }
+})
+```
+
+**When to use each field:**
+
+| Field | Visible To | Use For | Example |
+|-------|-----------|---------|---------|
+| `structuredData` | Model + Widget | Summary data the model should understand | Task counts, playlist metadata, board structure |
+| `message` | Model only | Explicit conversation text | "Here's your playlist" |
+| `meta` | Widget only | Full datasets, UI config, internal IDs | Complete task objects, image URLs, API tokens |
+
+<Tip>
+**Design Pattern**
+
+Think of `structuredData` as the "summary" and `_meta` as the "details":
+
+- **structuredData**: "5 tasks in To Do, 3 in Progress, 8 Done"
+- **meta**: Full task objects with descriptions, assignees, due dates
+</Tip>
+
+### Data Flow
+
+Understanding how data flows through the system:
+
+#### Initial Render
+
+1. User asks ChatGPT (e.g., "Show me the kanban board")
+2. ChatGPT's model decides to call your tool
+3. Your MCP server executes the tool and returns response with three parts:
+   - `structuredContent`: Data visible to both model and widget
+   - `content`: Text for model's conversation
+   - `_meta`: Internal data for widget only (full datasets, UI config)
+4. ChatGPT fetches the widget resource (HTML template)
+5. ChatGPT injects data into `window.openai` globals
+6. Your React component mounts and reads `window.openai.toolOutput`
+
+#### User Interaction
+
+1. User clicks a button in your widget
+2. Widget calls `window.openai.callTool("update-task", { id: 123, status: "done" })`
+3. Your MCP server processes the request
+4. Server returns updated data (same three-part structure)
+5. ChatGPT updates `window.openai.toolOutput`
+6. Your React component re-renders automatically via hooks
+
+#### State Persistence
+
+1. Component updates local state: `setWidgetState({ favorites: ["item-1", "item-2"] })`
+2. Automatically calls `window.openai.setWidgetState()`
+3. ChatGPT persists state to the conversation
+4. On page reload: ChatGPT injects persisted state
+5. Component reads `window.openai.widgetState`
+6. UI state is restored
+
+<Note>
+**Important: Widget State is Visible to the Model**
+
+When you call `setWidgetState()`, the model can see and reason about that state. This is intentional - it helps the model understand user preferences and intent. Keep widgetState under 4k tokens and only store what's useful for the model to know.
+</Note>
+
