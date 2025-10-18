@@ -7,7 +7,7 @@ description: "Deploy your first Typescript Streamable HTTP MCP server in minutes
 Get started with one command:
 
 ```bash
-npm create smithery
+npm create smithery@latest
 ```
 
 ### Overview
@@ -28,6 +28,18 @@ npm create smithery
 ```
 
 This retrieves and executes the [Create Smithery](https://github.com/smithery-ai/create-smithery) initializer package, which sets up a TypeScript MCP server scaffold with example code and all necessary dependencies.
+
+When you run the command, you'll be prompted with a few questions:
+
+1. **Project name** - Enter a name for your MCP server project
+2. **Local filesystem access** - Choose whether your server needs access to the local filesystem
+   - Select **No** for this quickstart (this will run as a hosted server)
+   - Select **Yes** if you're building a local-only server that runs on users' devices
+3. **Template selection** - Choose your server template:
+   - **basic** - A simple MCP server scaffold (recommended for this quickstart)
+   - **chatgpt-app** - An OpenAI app scaffold (see the [ChatGPT App quickstart](/build/chatgpt-apps/quickstart) for details)
+
+For this quickstart, select **No** for filesystem access and **basic** for the template.
 
 <Note>
 The scaffold installs everything you need, including:
